@@ -111,10 +111,15 @@ class _DashboardViewState extends State<DashboardView> {
 
   @override
   Widget build(BuildContext context) {
+    final isResolvingCard =
+        appState.isAuthenticated &&
+        appState.loadingCard &&
+        appState.currentCard == null;
+
     return Scaffold(
       backgroundColor: context.bgPage,
       body: SafeArea(
-        child: _loading
+        child: _loading || isResolvingCard
             ? const Center(child: CircularProgressIndicator())
             : LayoutBuilder(
                 builder: (context, constraints) {

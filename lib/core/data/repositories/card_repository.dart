@@ -48,7 +48,6 @@ class CardRepository {
         .from('digital_cards')
         .select()
         .eq('public_slug', slug)
-        .eq('is_active', true)
         .limit(1);
 
     if ((rows as List).isEmpty) return null;
@@ -63,7 +62,6 @@ class CardRepository {
         .from('digital_cards')
         .select()
         .eq('user_id', userId)
-        .eq('is_active', true)
         .limit(1);
 
     if ((rows as List).isEmpty) return null;
@@ -244,6 +242,23 @@ class CardRepository {
 
   static Future<void> saveCard(DigitalCardModel card) async {
     await _db.from('digital_cards').update(card.toJson()).eq('id', card.id);
+  }
+
+  static Future<void> setCardActiveState({
+    required String cardId,
+    required bool isActive,
+    String? reason,
+  }) async {
+    final currentUser = _db.auth.currentUser;
+    await _db
+        .from('digital_cards')
+        .update({
+          'is_active': isActive,
+          'deactivated_at': isActive ? null : DateTime.now().toIso8601String(),
+          'deactivation_reason': isActive ? null : reason,
+          'deactivated_by': isActive ? null : currentUser?.id,
+        })
+        .eq('id', cardId);
   }
 
   // ─── Contact items ────────────────────────────────────────────────────────

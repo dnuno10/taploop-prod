@@ -319,6 +319,7 @@ class _AdminViewState extends State<AdminView> {
         return _AdminMember(
           member: m,
           card: card,
+          isActive: card.isActive,
           forms: _formsFromCard(card),
           calendarProvider: _providerFromUrl(card.calendarUrl),
           calendarioUrl: card.calendarUrl,
@@ -612,8 +613,32 @@ class _AdminViewState extends State<AdminView> {
     );
   }
 
-  void _toggleMember(_AdminMember m, bool value) {
+  Future<void> _toggleMember(_AdminMember m, bool value) async {
+    final previous = m.isActive;
     setState(() => m.isActive = value);
+    try {
+      await AdminRepository.updateCardActivation(
+        cardId: m.card.id,
+        isActive: value,
+        reason: value ? null : 'Tarjeta digital desactivada por seguridad',
+      );
+      m.card = m.card.copyWith(
+        isActive: value,
+        deactivatedAt: value ? null : DateTime.now(),
+        deactivationReason: value
+            ? null
+            : 'Tarjeta digital desactivada por seguridad',
+      );
+      if (appState.currentCard?.id == m.card.id) {
+        appState.updateCard(m.card);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => m.isActive = previous);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar la tarjeta: $e')),
+      );
+    }
   }
 }
 

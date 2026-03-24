@@ -73,7 +73,7 @@ class _PublicCardViewState extends State<PublicCardView> {
             _notFound = card == null;
             _loading = false;
           });
-        if (card != null) {
+        if (card != null && card.isActive) {
           final source = (widget.via == 'qr') ? 'qr' : 'link';
           AnalyticsRepository.recordVisit(card.id, source);
         }
@@ -114,7 +114,9 @@ class _PublicCardViewState extends State<PublicCardView> {
         _nfcState = _NfcState.showCard;
         _loading = false;
       });
-    if (card != null) AnalyticsRepository.recordVisit(card.id, 'nfc');
+    if (card != null && card.isActive) {
+      AnalyticsRepository.recordVisit(card.id, 'nfc');
+    }
   }
 
   Future<void> _activate() async {
@@ -181,6 +183,13 @@ class _PublicCardViewState extends State<PublicCardView> {
       return _NotFoundPage(
         slug: widget.slug ?? widget.nfcSerial ?? widget.userId ?? '',
         errorDetail: _errorDetail,
+      );
+    }
+    if (!_card!.isActive) {
+      return _CardDeactivatedPage(
+        message: _card!.deactivationReason?.trim().isNotEmpty == true
+            ? _card!.deactivationReason!
+            : 'Tarjeta digital desactivada por seguridad',
       );
     }
     return _CardPage(card: _card!);
@@ -256,6 +265,65 @@ BoxDecoration _buildPageDecoration(DigitalCardModel card) {
       );
     default:
       return BoxDecoration(color: bgBase);
+  }
+}
+
+class _CardDeactivatedPage extends StatelessWidget {
+  final String message;
+
+  const _CardDeactivatedPage({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.surface,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.shield_outlined,
+                    size: 42,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF111827),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Esta tarjeta no se encuentra disponible temporalmente.',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.dmSans(
+                      fontSize: 14,
+                      height: 1.5,
+                      color: const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

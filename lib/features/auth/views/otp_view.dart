@@ -83,9 +83,11 @@ class _OtpViewState extends State<OtpView> {
       );
       if (!mounted) return;
       appState.setUser(user);
+      appState.setLoadingCard(true);
       final card = await AuthService.fetchUserCard(user.id);
       if (!mounted) return;
       appState.setCard(card);
+      appState.setLoadingCard(false);
       final pendingNfc = widget.pendingNfc;
       if (pendingNfc != null && pendingNfc.isNotEmpty) {
         context.go('/nfc/$pendingNfc');
@@ -93,6 +95,7 @@ class _OtpViewState extends State<OtpView> {
         context.go('/');
       }
     } catch (e) {
+      appState.setLoadingCard(false);
       if (mounted) {
         setState(() {
           _loading = false;

@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme_extensions.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/card_initial_setup_state.dart';
+import '../../analytics/models/visit_event_model.dart';
 import '../models/campaign_model.dart';
 
 String _fmtDate(DateTime d) {
@@ -26,6 +27,24 @@ String _fmtDate(DateTime d) {
     'dic',
   ];
   return '${d.day} ${months[d.month - 1]} ${d.year}';
+}
+
+String _fmtShortDate(DateTime d) {
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+  return '${d.day} ${months[d.month - 1]}';
 }
 
 class CampaignsView extends StatefulWidget {
@@ -125,7 +144,13 @@ class _CampaignsViewState extends State<CampaignsView> {
           created.id,
           result.members.map((member) => member.userId).toList(),
         );
-        if (mounted) setState(() => _campaigns.insert(0, created));
+        final hydrated = created.copyWith(
+          assignedMemberNames: result.members
+              .map((member) => member.name)
+              .toList(),
+          memberRoles: result.campaign.memberRoles,
+        );
+        if (mounted) setState(() => _campaigns.insert(0, hydrated));
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(
@@ -163,10 +188,16 @@ class _CampaignsViewState extends State<CampaignsView> {
           updated.id,
           result.members.map((member) => member.userId).toList(),
         );
+        final hydrated = updated.copyWith(
+          assignedMemberNames: result.members
+              .map((member) => member.name)
+              .toList(),
+          memberRoles: result.campaign.memberRoles,
+        );
         if (mounted) {
           setState(() {
             final idx = _campaigns.indexWhere((x) => x.id == updated.id);
-            if (idx != -1) _campaigns[idx] = updated;
+            if (idx != -1) _campaigns[idx] = hydrated;
           });
         }
       } catch (e) {
@@ -216,6 +247,7 @@ class _CampaignsViewState extends State<CampaignsView> {
     final finished = _campaigns
         .where((c) => c.status == CampaignStatus.finished)
         .toList();
+    final hasCampaigns = _campaigns.isNotEmpty;
 
     return Scaffold(
       backgroundColor: context.bgPage,
@@ -243,7 +275,7 @@ class _CampaignsViewState extends State<CampaignsView> {
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        'Organiza activaciones, eventos y seguimiento comercial con una vista clara.',
+                        'Planea eventos, asigna equipo y centraliza las interacciones de cada campaña.',
                         style: GoogleFonts.dmSans(
                           fontSize: 13,
                           color: context.textSecondary,
@@ -283,18 +315,12 @@ class _CampaignsViewState extends State<CampaignsView> {
               ),
             )
           else ...[
-            // ── Summary Strip ──────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
-                child: Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: context.bgCard,
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: context.borderColor),
-                  ),
-                  child: _SummaryStrip(campaigns: _campaigns),
+                child: _CampaignOverviewPanel(
+                  campaigns: _campaigns,
+                  onCreate: _showNewCampaignSheet,
                 ),
               ),
             ),
@@ -303,8 +329,15 @@ class _CampaignsViewState extends State<CampaignsView> {
               const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
               )
+            else if (!hasCampaigns)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 40),
+                  child: _CampaignEmptyState(onCreate: _showNewCampaignSheet),
+                ),
+              )
             else ...[
-              // ── Active ─────────────────────────────────────────────────────
               if (active.isNotEmpty) ...[
                 _SectionHeader(label: 'Activas', count: active.length),
                 SliverPadding(
@@ -332,7 +365,6 @@ class _CampaignsViewState extends State<CampaignsView> {
                 ),
               ],
 
-              // ── Upcoming ───────────────────────────────────────────────────
               if (upcoming.isNotEmpty) ...[
                 _SectionHeader(label: 'Próximas', count: upcoming.length),
                 SliverPadding(
@@ -360,7 +392,6 @@ class _CampaignsViewState extends State<CampaignsView> {
                 ),
               ],
 
-              // ── Finished ───────────────────────────────────────────────────
               if (finished.isNotEmpty) ...[
                 _SectionHeader(label: 'Terminadas', count: finished.length),
                 SliverPadding(
@@ -405,9 +436,22 @@ class _SummaryStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final totalTaps = campaigns.fold(0, (s, c) => s + c.taps);
-    final totalLeads = campaigns.fold(0, (s, c) => s + c.leads);
-    final totalConv = campaigns.fold(0, (s, c) => s + c.conversions);
+    final active = campaigns
+        .where((campaign) => campaign.status == CampaignStatus.active)
+        .length;
+    final upcoming = campaigns
+        .where((campaign) => campaign.status == CampaignStatus.upcoming)
+        .length;
+    final finished = campaigns
+        .where((campaign) => campaign.status == CampaignStatus.finished)
+        .length;
+    final withSchedule = campaigns
+        .where(
+          (campaign) =>
+              (campaign.startTime?.isNotEmpty ?? false) ||
+              (campaign.endTime?.isNotEmpty ?? false),
+        )
+        .length;
 
     return Container(
       decoration: BoxDecoration(
@@ -420,11 +464,241 @@ class _SummaryStrip extends StatelessWidget {
         children: [
           _Metric(label: 'Campañas', value: '${campaigns.length}'),
           _VertDivider(),
-          _Metric(label: 'Taps', value: '$totalTaps'),
+          _Metric(label: 'Activas', value: '$active'),
           _VertDivider(),
-          _Metric(label: 'Leads', value: '$totalLeads'),
+          _Metric(label: 'Próximas', value: '$upcoming'),
           _VertDivider(),
-          _Metric(label: 'Cierres', value: '$totalConv'),
+          _Metric(label: 'Terminadas', value: '$finished'),
+          _VertDivider(),
+          _Metric(label: 'Con horario', value: '$withSchedule'),
+        ],
+      ),
+    );
+  }
+}
+
+class _CampaignOverviewPanel extends StatelessWidget {
+  final List<CampaignModel> campaigns;
+  final VoidCallback onCreate;
+
+  const _CampaignOverviewPanel({
+    required this.campaigns,
+    required this.onCreate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: context.bgCard,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 560),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Cómo funciona',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Cada campaña reúne tres piezas: cuándo sucede, quién participa y qué interacciones deben quedar agrupadas.',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        height: 1.45,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: onCreate,
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: const Text('Crear campaña'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: const BorderSide(color: AppColors.primary),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const _CampaignFlowSteps(),
+          const SizedBox(height: 18),
+          _SummaryStrip(campaigns: campaigns),
+        ],
+      ),
+    );
+  }
+}
+
+class _CampaignFlowSteps extends StatelessWidget {
+  const _CampaignFlowSteps();
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = [
+      (
+        '1. Programa',
+        'Define fecha, lugar y horario para saber cuándo aplica la campaña.',
+      ),
+      (
+        '2. Asigna equipo',
+        'Selecciona a los usuarios que participarán en esa operación.',
+      ),
+      (
+        '3. Da seguimiento',
+        'Consulta la campaña correcta sin mezclar actividades de otros eventos.',
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final itemWidth = width > 900
+            ? (width - 24) / 3
+            : width > 560
+            ? (width - 12) / 2
+            : width;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: steps
+              .map(
+                (step) => SizedBox(
+                  width: itemWidth,
+                  child: _FlowStepCard(title: step.$1, description: step.$2),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _FlowStepCard extends StatelessWidget {
+  final String title;
+  final String description;
+
+  const _FlowStepCard({required this.title, required this.description});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.bgPage,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: GoogleFonts.outfit(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: context.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            description,
+            style: GoogleFonts.dmSans(
+              fontSize: 12,
+              height: 1.4,
+              color: context.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CampaignEmptyState extends StatelessWidget {
+  final VoidCallback onCreate;
+
+  const _CampaignEmptyState({required this.onCreate});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: context.bgCard,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.campaign_outlined,
+            color: AppColors.primary,
+            size: 34,
+          ),
+          const SizedBox(height: 18),
+          Text(
+            'Aún no hay campañas creadas',
+            style: GoogleFonts.outfit(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: context.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Empieza con una campaña simple: fecha, horario y el equipo que participará. Después podrás revisar su seguimiento sin mezclarla con otras.',
+            style: GoogleFonts.dmSans(
+              fontSize: 13,
+              height: 1.5,
+              color: context.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          FilledButton.icon(
+            onPressed: onCreate,
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Crear primera campaña'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: AppColors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -566,6 +840,10 @@ class _CampaignCardState extends State<_CampaignCard> {
   @override
   Widget build(BuildContext context) {
     final c = widget.campaign;
+    final memberCount = c.memberRoles.isNotEmpty
+        ? c.memberRoles.length
+        : c.assignedMemberNames.length;
+    final scheduleLabel = _formatTimeRange(c.startTime, c.endTime);
     final infoItems = <_DetailInfoData>[
       _DetailInfoData('Tipo', c.eventType ?? 'Sin definir'),
       _DetailInfoData('Objetivo', c.objective?.label ?? 'Sin definir'),
@@ -583,17 +861,32 @@ class _CampaignCardState extends State<_CampaignCard> {
         c.leadGoal != null ? '${c.leadGoal}' : 'Sin definir',
       ),
     ];
+    final overviewTags = <Widget>[
+      _InfoPill(
+        icon: Icons.calendar_today_outlined,
+        label: _fmtDate(c.eventDate),
+      ),
+      if (scheduleLabel != null)
+        _InfoPill(icon: Icons.schedule_outlined, label: scheduleLabel),
+      _InfoPill(
+        icon: Icons.group_outlined,
+        label: memberCount == 0
+            ? 'Sin equipo asignado'
+            : '$memberCount en equipo',
+      ),
+      _InfoPill(icon: Icons.location_on_outlined, label: c.location),
+    ];
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: context.bgCard,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.borderColor),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Card Header ──────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
@@ -624,45 +917,18 @@ class _CampaignCardState extends State<_CampaignCard> {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on_outlined,
-                            size: 12,
-                            color: context.textMuted,
-                          ),
-                          const SizedBox(width: 2),
-                          Expanded(
-                            child: Text(
-                              c.location,
-                              style: GoogleFonts.dmSans(
-                                fontSize: 12,
-                                color: context.textSecondary,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Icon(
-                            Icons.calendar_today_outlined,
-                            size: 12,
-                            color: context.textMuted,
-                          ),
-                          const SizedBox(width: 2),
-                          Text(
-                            _fmtDate(c.eventDate),
-                            style: GoogleFonts.dmSans(
-                              fontSize: 12,
-                              color: context.textSecondary,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        _campaignHeadline(c),
+                        style: GoogleFonts.dmSans(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: context.textSecondary,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Status chip
                 _StatusChip(status: c.status),
                 const SizedBox(width: 4),
                 PopupMenuButton<String>(
@@ -709,8 +975,11 @@ class _CampaignCardState extends State<_CampaignCard> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Wrap(spacing: 8, runSpacing: 8, children: overviewTags),
+          ),
 
-          // ── Stats Row ────────────────────────────────────────────────
           if (c.status != CampaignStatus.upcoming)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -719,8 +988,8 @@ class _CampaignCardState extends State<_CampaignCard> {
                 runSpacing: 6,
                 children: [
                   _StatChip(
-                    icon: Icons.touch_app_outlined,
-                    label: '${c.taps} taps',
+                    icon: Icons.bolt_outlined,
+                    label: '${c.interactionCount} interacciones',
                   ),
                   _StatChip(
                     icon: Icons.person_add_alt_outlined,
@@ -738,7 +1007,6 @@ class _CampaignCardState extends State<_CampaignCard> {
               ),
             ),
 
-          // ── Conversion bar ───────────────────────────────────────────
           if (c.status != CampaignStatus.upcoming) ...[
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -757,11 +1025,10 @@ class _CampaignCardState extends State<_CampaignCard> {
           ],
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: _AlwaysVisibleGeneralInfo(campaign: c, items: infoItems),
           ),
 
-          // ── Expand Toggle ────────────────────────────────────────────
           GestureDetector(
             onTap: () => setState(() => _expanded = !_expanded),
             child: Padding(
@@ -777,7 +1044,7 @@ class _CampaignCardState extends State<_CampaignCard> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    _expanded ? 'Detalle operativo' : 'Abrir detalle operativo',
+                    _expanded ? 'Ocultar detalle' : 'Ver detalle y equipo',
                     style: GoogleFonts.dmSans(
                       fontSize: 12,
                       color: context.textSecondary,
@@ -789,7 +1056,6 @@ class _CampaignCardState extends State<_CampaignCard> {
             ),
           ),
 
-          // ── Expanded Detail ──────────────────────────────────────────
           AnimatedSize(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeInOut,
@@ -827,7 +1093,22 @@ class _CampaignDetailState extends State<_CampaignDetail> {
   @override
   void initState() {
     super.initState();
+    _members = _fallbackMembers();
+    _loadingMembers = _members.isEmpty;
     _fetchMembers();
+  }
+
+  List<Map<String, String>> _fallbackMembers() {
+    return widget.campaign.assignedMemberNames
+        .map(
+          (name) => <String, String>{
+            'id': name,
+            'name': name,
+            'role': '',
+            'job_title': '',
+          },
+        )
+        .toList();
   }
 
   Future<void> _fetchMembers() async {
@@ -836,7 +1117,9 @@ class _CampaignDetailState extends State<_CampaignDetail> {
     );
     if (!mounted) return;
     setState(() {
-      _members = members;
+      if (members.isNotEmpty) {
+        _members = members;
+      }
       _loadingMembers = false;
     });
   }
@@ -889,12 +1172,60 @@ class _CampaignDetailState extends State<_CampaignDetail> {
     }
   }
 
+  Future<void> _showMemberAnalytics(Map<String, String> member) async {
+    final userId = member['id'];
+    if (userId == null || userId.isEmpty) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => FutureBuilder<CampaignMemberAnalytics?>(
+        future: CampaignRepository.fetchMemberAnalyticsForCampaign(
+          campaignId: widget.campaign.id,
+          userId: userId,
+        ),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return Dialog(
+              backgroundColor: context.bgCard,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(24),
+                child: SizedBox(
+                  height: 56,
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              ),
+            );
+          }
+
+          final data = snapshot.data;
+          return _MemberAnalyticsDialog(
+            campaignName: widget.campaign.name,
+            memberName: member['name'] ?? '',
+            fallbackRole: _resolveMemberRole(
+              member['id'],
+              member['role'],
+              widget.campaign.memberRoles,
+            ),
+            fallbackJobTitle: member['job_title'],
+            analytics: data,
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final campaign = widget.campaign;
-    final memberCount = _members.isEmpty ? 1 : _members.length;
+    final visibleMemberCount = _members.isEmpty
+        ? campaign.assignedMemberNames.length
+        : _members.length;
+    final memberCount = visibleMemberCount == 0 ? 1 : visibleMemberCount;
     final leadsPerMember = campaign.leads / memberCount;
-    final tapsPerMember = campaign.taps / memberCount;
+    final interactionsPerMember = campaign.interactionCount / memberCount;
     final conversionsPerMember = campaign.conversions / memberCount;
 
     return Padding(
@@ -922,8 +1253,7 @@ class _CampaignDetailState extends State<_CampaignDetail> {
                 ),
                 _StatChip(
                   icon: Icons.bolt_outlined,
-                  label:
-                      '${campaign.interactionCount > 0 ? campaign.interactionCount : campaign.taps} interacciones',
+                  label: '${campaign.interactionCount} interacciones',
                 ),
               ],
             ),
@@ -933,7 +1263,7 @@ class _CampaignDetailState extends State<_CampaignDetail> {
             child: Column(
               children: [
                 _PerformanceChart(
-                  taps: campaign.taps,
+                  interactions: campaign.interactionCount,
                   leads: campaign.leads,
                   conversions: campaign.conversions,
                 ),
@@ -943,7 +1273,7 @@ class _CampaignDetailState extends State<_CampaignDetail> {
                     Expanded(
                       child: _PerformanceKpi(
                         label: 'Miembros',
-                        value: '${_members.length}',
+                        value: '$visibleMemberCount',
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -956,8 +1286,8 @@ class _CampaignDetailState extends State<_CampaignDetail> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _PerformanceKpi(
-                        label: 'Taps / miembro',
-                        value: tapsPerMember.toStringAsFixed(1),
+                        label: 'Interacciones / miembro',
+                        value: interactionsPerMember.toStringAsFixed(1),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -985,14 +1315,35 @@ class _CampaignDetailState extends State<_CampaignDetail> {
               ),
             ),
             child: _loadingMembers
-                ? const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8),
-                    child: SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  )
+                ? _members.isEmpty
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: _members
+                              .map(
+                                (member) => _MemberCard(
+                                  name: member['name'] ?? '',
+                                  role: _resolveMemberRole(
+                                    member['id'],
+                                    member['role'],
+                                    widget.campaign.memberRoles,
+                                  ),
+                                  jobTitle: member['job_title'],
+                                  onInsights: () =>
+                                      _showMemberAnalytics(member),
+                                  onRemove: () => _removeMember(member['id']!),
+                                ),
+                              )
+                              .toList(),
+                        )
                 : _members.isEmpty
                 ? Text(
                     'Sin miembros asignados.',
@@ -1014,6 +1365,7 @@ class _CampaignDetailState extends State<_CampaignDetail> {
                               widget.campaign.memberRoles,
                             ),
                             jobTitle: member['job_title'],
+                            onInsights: () => _showMemberAnalytics(member),
                             onRemove: () => _removeMember(member['id']!),
                           ),
                         )
@@ -1025,7 +1377,7 @@ class _CampaignDetailState extends State<_CampaignDetail> {
               padding: const EdgeInsets.only(top: 2),
               child: Text(
                 campaign.leads > 0
-                    ? 'Promedio actual: ${(campaign.taps / campaign.leads).toStringAsFixed(1)} taps por lead.'
+                    ? 'Promedio actual: ${(campaign.interactionCount / campaign.leads).toStringAsFixed(1)} interacciones por lead.'
                     : 'Sin leads registrados aún.',
                 style: GoogleFonts.dmSans(
                   fontSize: 12,
@@ -1108,6 +1460,44 @@ class _StatChip extends StatelessWidget {
               fontSize: 12,
               fontWeight: FontWeight.w500,
               color: context.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _InfoPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: context.bgPage,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: context.textSecondary),
+          const SizedBox(width: 6),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 220),
+            child: Text(
+              label,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.dmSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: context.textSecondary,
+              ),
             ),
           ),
         ],
@@ -1287,10 +1677,12 @@ class _MemberCard extends StatelessWidget {
   final String name;
   final String? role;
   final String? jobTitle;
+  final VoidCallback onInsights;
   final VoidCallback onRemove;
 
   const _MemberCard({
     required this.name,
+    required this.onInsights,
     required this.onRemove,
     this.role,
     this.jobTitle,
@@ -1338,6 +1730,16 @@ class _MemberCard extends StatelessWidget {
             ),
           ),
           IconButton(
+            onPressed: onInsights,
+            icon: Icon(
+              Icons.query_stats_outlined,
+              size: 18,
+              color: context.textMuted,
+            ),
+            tooltip: 'Ver analítica',
+            visualDensity: VisualDensity.compact,
+          ),
+          IconButton(
             onPressed: onRemove,
             icon: Icon(Icons.close_rounded, size: 18, color: context.textMuted),
             visualDensity: VisualDensity.compact,
@@ -1348,24 +1750,281 @@ class _MemberCard extends StatelessWidget {
   }
 }
 
+class _MemberAnalyticsDialog extends StatelessWidget {
+  final String campaignName;
+  final String memberName;
+  final String? fallbackRole;
+  final String? fallbackJobTitle;
+  final CampaignMemberAnalytics? analytics;
+
+  const _MemberAnalyticsDialog({
+    required this.campaignName,
+    required this.memberName,
+    this.fallbackRole,
+    this.fallbackJobTitle,
+    this.analytics,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final data = analytics;
+    final roleLine = [
+      if (fallbackRole != null && fallbackRole!.isNotEmpty) fallbackRole!,
+      if ((data?.jobTitle ?? fallbackJobTitle)?.isNotEmpty == true)
+        data?.jobTitle ?? fallbackJobTitle!,
+    ].join(' • ');
+
+    return Dialog(
+      backgroundColor: context.bgCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          memberName,
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: context.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Analítica dentro de $campaignName',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 12,
+                            color: context.textSecondary,
+                          ),
+                        ),
+                        if (roleLine.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            roleLine,
+                            style: GoogleFonts.dmSans(
+                              fontSize: 12,
+                              color: context.textMuted,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (data == null)
+                Text(
+                  'No se pudo cargar la analítica de este miembro.',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 13,
+                    color: context.textSecondary,
+                  ),
+                )
+              else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _PerformanceKpi(
+                        label: 'Vistas',
+                        value: '${data.profileViews}',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _PerformanceKpi(
+                        label: 'Clicks',
+                        value: '${data.clicks}',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _PerformanceKpi(
+                        label: 'Formularios',
+                        value: '${data.forms}',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _PerformanceKpi(
+                        label: 'Interacciones',
+                        value: '${data.interactions}',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _PerformanceKpi(
+                        label: 'Leads',
+                        value: '${data.leads}',
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _PerformanceKpi(
+                        label: 'Cierres',
+                        value: '${data.conversions}',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                _DetailSection(
+                  title: 'Fuentes dentro de campaña',
+                  child: data.sources.isEmpty
+                      ? Text(
+                          'Sin interacciones registradas todavía.',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 12,
+                            color: context.textMuted,
+                          ),
+                        )
+                      : Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: data.sources
+                              .map(
+                                (source) => _StatChip(
+                                  icon: Icons.bolt_outlined,
+                                  label: source,
+                                ),
+                              )
+                              .toList(),
+                        ),
+                ),
+                const SizedBox(height: 14),
+                _DetailSection(
+                  title: 'Actividad reciente',
+                  child: data.recentEvents.isEmpty
+                      ? Text(
+                          'Sin actividad reciente atribuida a esta campaña.',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 12,
+                            color: context.textMuted,
+                          ),
+                        )
+                      : Column(
+                          children: data.recentEvents
+                              .map(
+                                (event) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _CampaignMemberEventRow(event: event),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CampaignMemberEventRow extends StatelessWidget {
+  final VisitEventModel event;
+
+  const _CampaignMemberEventRow({required this.event});
+
+  @override
+  Widget build(BuildContext context) {
+    final source = (event.source ?? 'interaccion').toUpperCase();
+    final label = event.label?.trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: context.bgPage,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.timeline_outlined,
+              size: 18,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label?.isNotEmpty == true ? label! : source,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: context.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '$source • ${event.formattedDate} • ${event.formattedTime}',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    color: context.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PerformanceChart extends StatelessWidget {
-  final int taps;
+  final int interactions;
   final int leads;
   final int conversions;
 
   const _PerformanceChart({
-    required this.taps,
+    required this.interactions,
     required this.leads,
     required this.conversions,
   });
 
   @override
   Widget build(BuildContext context) {
-    final values = [taps, leads, conversions];
+    final values = [interactions, leads, conversions];
     final maxValue = values.reduce((a, b) => a > b ? a : b).clamp(1, 1 << 30);
     return Column(
       children: [
-        _MetricBarRow(label: 'Taps', value: taps, ratio: taps / maxValue),
+        _MetricBarRow(
+          label: 'Interacciones',
+          value: interactions,
+          ratio: interactions / maxValue,
+        ),
         const SizedBox(height: 10),
         _MetricBarRow(label: 'Leads', value: leads, ratio: leads / maxValue),
         const SizedBox(height: 10),
@@ -1660,12 +2319,9 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
   late final TextEditingController _locationCtrl;
   late final TextEditingController _zoneCtrl;
   late final TextEditingController _descCtrl;
-  late final TextEditingController _durationCtrl;
-  late final TextEditingController _shiftCtrl;
   late final TextEditingController _leadGoalCtrl;
   late DateTime _date;
   late String _type;
-  late CampaignStatus _status;
   CampaignObjective? _objective;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
@@ -1692,19 +2348,17 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
     _locationCtrl = TextEditingController(text: existing?.location ?? '');
     _zoneCtrl = TextEditingController(text: existing?.zone ?? '');
     _descCtrl = TextEditingController(text: existing?.description ?? '');
-    _durationCtrl = TextEditingController(
-      text: existing?.durationMinutes?.toString() ?? '',
-    );
-    _shiftCtrl = TextEditingController(text: existing?.shiftNotes ?? '');
     _leadGoalCtrl = TextEditingController(
       text: existing?.leadGoal?.toString() ?? '',
     );
-    _date = existing?.eventDate ?? DateTime.now().add(const Duration(days: 30));
+    final now = DateTime.now();
+    _date = existing?.eventDate ?? DateTime(now.year, now.month, now.day);
     _type = existing?.eventType ?? 'Evento';
-    _status = existing?.status ?? CampaignStatus.upcoming;
     _objective = existing?.objective;
-    _startTime = _parseTimeOfDay(existing?.startTime);
-    _endTime = _parseTimeOfDay(existing?.endTime);
+    const fallbackStart = TimeOfDay(hour: 9, minute: 0);
+    const fallbackEnd = TimeOfDay(hour: 18, minute: 0);
+    _startTime = _parseTimeOfDay(existing?.startTime) ?? fallbackStart;
+    _endTime = _parseTimeOfDay(existing?.endTime) ?? fallbackEnd;
     _loadUsers();
   }
 
@@ -1747,8 +2401,6 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
     _locationCtrl.dispose();
     _zoneCtrl.dispose();
     _descCtrl.dispose();
-    _durationCtrl.dispose();
-    _shiftCtrl.dispose();
     _leadGoalCtrl.dispose();
     super.dispose();
   }
@@ -1814,6 +2466,24 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
       );
       return;
     }
+    if (_startTime == null || _endTime == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecciona una hora de inicio y una hora de fin.'),
+        ),
+      );
+      return;
+    }
+    if (!_isValidTimeRange(_startTime!, _endTime!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'La hora de fin debe ser posterior a la hora de inicio.',
+          ),
+        ),
+      );
+      return;
+    }
     final existing = widget.existing;
     final memberRoles = <String, String>{
       for (final member in _selectedMembers)
@@ -1829,7 +2499,7 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
           ? 'Por definir'
           : _locationCtrl.text.trim(),
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
-      status: _status,
+      status: _deriveCampaignStatusForEditor(_date, _startTime!, _endTime!),
       taps: existing?.taps ?? 0,
       leads: existing?.leads ?? 0,
       conversions: existing?.conversions ?? 0,
@@ -1839,10 +2509,8 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
       zone: _zoneCtrl.text.trim().isEmpty ? null : _zoneCtrl.text.trim(),
       startTime: _formatTimeOfDay(_startTime),
       endTime: _formatTimeOfDay(_endTime),
-      durationMinutes: int.tryParse(_durationCtrl.text.trim()),
-      shiftNotes: _shiftCtrl.text.trim().isEmpty
-          ? null
-          : _shiftCtrl.text.trim(),
+      durationMinutes: null,
+      shiftNotes: null,
       objective: _objective,
       leadGoal: int.tryParse(_leadGoalCtrl.text.trim()),
       sourceChannels: existing?.sourceChannels ?? const [],
@@ -1901,15 +2569,25 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
               ),
               const SizedBox(height: 4),
               Text(
-                'Estructura la campaña por objetivos, tiempo, equipo y tracking.',
+                'Completa los pasos principales para que cualquier persona entienda cuándo sucede, quién participa y qué se espera de esta campaña.',
                 style: GoogleFonts.dmSans(
                   fontSize: 12,
                   color: context.textSecondary,
                 ),
               ),
               sectionSpacing,
+              _EditorProgressSummary(
+                date: _date,
+                startTime: _startTime,
+                endTime: _endTime,
+                selectedMembers: _selectedMembers.length,
+                objective: _objective?.label,
+              ),
+              sectionSpacing,
               _FormSection(
-                title: 'Información general',
+                title: '1. Define la campaña',
+                subtitle:
+                    'Ponle un nombre claro y deja explícito qué tipo de evento es.',
                 child: Column(
                   children: [
                     _SheetField(
@@ -1958,7 +2636,9 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
               ),
               sectionSpacing,
               _FormSection(
-                title: 'Ubicación',
+                title: '2. Ubicación',
+                subtitle:
+                    'Escribe el lugar para que el equipo sepa dónde aplica esta campaña.',
                 child: Column(
                   children: [
                     Row(
@@ -1996,7 +2676,9 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
               ),
               sectionSpacing,
               _FormSection(
-                title: 'Tiempo',
+                title: '3. Fecha y horario',
+                subtitle:
+                    'Este bloque define cuándo debe considerarse activa la campaña.',
                 child: Column(
                   children: [
                     Row(
@@ -2012,8 +2694,7 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                         Expanded(
                           child: _TimeField(
                             label: 'Hora de inicio',
-                            value:
-                                _formatTimeOfDay(_startTime) ?? 'Seleccionar',
+                            value: _formatTimeOfDay(_startTime)!,
                             onTap: () => _pickTime(start: true),
                           ),
                         ),
@@ -2021,39 +2702,31 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                         Expanded(
                           child: _TimeField(
                             label: 'Hora de fin',
-                            value: _formatTimeOfDay(_endTime) ?? 'Seleccionar',
+                            value: _formatTimeOfDay(_endTime)!,
                             onTap: () => _pickTime(start: false),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _SheetField(
-                            controller: _durationCtrl,
-                            label: 'Duración (minutos)',
-                            hint: 'Ej. 360',
-                            keyboardType: TextInputType.number,
-                          ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'El rango horario es obligatorio y la hora de fin debe ser posterior a la de inicio.',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 11,
+                          color: context.textMuted,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SheetField(
-                            controller: _shiftCtrl,
-                            label: 'Turnos / notas',
-                            hint: 'Ej. Matutino y vespertino',
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
               sectionSpacing,
               _FormSection(
-                title: 'Equipo',
+                title: '4. Equipo',
+                subtitle:
+                    'Selecciona a los usuarios que participarán y asigna su rol operativo.',
                 trailing: _loadingUsers
                     ? const SizedBox(
                         width: 18,
@@ -2114,7 +2787,9 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
               ),
               sectionSpacing,
               _FormSection(
-                title: 'Objetivos y tracking',
+                title: '5. Objetivo comercial',
+                subtitle:
+                    'Define la meta para que la campaña tenga una expectativa clara.',
                 child: Column(
                   children: [
                     Row(
@@ -2127,21 +2802,18 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                             keyboardType: TextInputType.number,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _SheetDropdownField<CampaignStatus>(
-                            label: 'Estado',
-                            value: _status,
-                            items: CampaignStatus.values,
-                            itemLabel: (value) => value.label,
-                            onChanged: (value) {
-                              if (value != null) {
-                                setState(() => _status = value);
-                              }
-                            },
-                          ),
-                        ),
                       ],
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        'El estado se calcula automáticamente: próxima, activa o terminada según la fecha y el horario.',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 11,
+                          color: context.textMuted,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -2188,8 +2860,14 @@ class _FormSection extends StatelessWidget {
   final String title;
   final Widget child;
   final Widget? trailing;
+  final String? subtitle;
 
-  const _FormSection({required this.title, required this.child, this.trailing});
+  const _FormSection({
+    required this.title,
+    required this.child,
+    this.trailing,
+    this.subtitle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2219,12 +2897,84 @@ class _FormSection extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle!,
+              style: GoogleFonts.dmSans(
+                fontSize: 12,
+                height: 1.4,
+                color: context.textSecondary,
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           child,
         ],
       ),
     );
   }
+}
+
+class _EditorProgressSummary extends StatelessWidget {
+  final DateTime date;
+  final TimeOfDay? startTime;
+  final TimeOfDay? endTime;
+  final int selectedMembers;
+  final String? objective;
+
+  const _EditorProgressSummary({
+    required this.date,
+    required this.startTime,
+    required this.endTime,
+    required this.selectedMembers,
+    required this.objective,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final schedule = _formatTimeRange(
+      _formatTimeOfDay(startTime),
+      _formatTimeOfDay(endTime),
+    );
+    final chips = <String>[
+      'Fecha ${_fmtShortDate(date)}',
+      if (schedule != null) 'Horario $schedule',
+      if (selectedMembers > 0) '$selectedMembers miembros',
+      objective ?? 'Objetivo por definir',
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.bgPage,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.borderColor),
+      ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: chips
+            .map(
+              (chip) =>
+                  _InfoPill(icon: Icons.check_circle_outline, label: chip),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+String _campaignHeadline(CampaignModel campaign) {
+  final schedule = _formatTimeRange(campaign.startTime, campaign.endTime);
+  final parts = <String>[
+    if (campaign.eventType != null && campaign.eventType!.trim().isNotEmpty)
+      campaign.eventType!,
+    'el ${_fmtShortDate(campaign.eventDate)}',
+    if (schedule != null) 'de $schedule',
+  ];
+  return parts.join(' ');
 }
 
 class _DateField extends StatelessWidget {
@@ -2557,6 +3307,37 @@ String? _formatDuration(int? minutes) {
   if (hours == 0) return '$minutes min';
   if (remaining == 0) return '$hours h';
   return '$hours h $remaining min';
+}
+
+bool _isValidTimeRange(TimeOfDay start, TimeOfDay end) {
+  final startMinutes = (start.hour * 60) + start.minute;
+  final endMinutes = (end.hour * 60) + end.minute;
+  return endMinutes > startMinutes;
+}
+
+CampaignStatus _deriveCampaignStatusForEditor(
+  DateTime date,
+  TimeOfDay start,
+  TimeOfDay end,
+) {
+  final startsAt = DateTime(
+    date.year,
+    date.month,
+    date.day,
+    start.hour,
+    start.minute,
+  );
+  final endsAt = DateTime(
+    date.year,
+    date.month,
+    date.day,
+    end.hour,
+    end.minute,
+  );
+  final now = DateTime.now();
+  if (now.isBefore(startsAt)) return CampaignStatus.upcoming;
+  if (now.isAfter(endsAt)) return CampaignStatus.finished;
+  return CampaignStatus.active;
 }
 
 CampaignMemberRole? _roleFromMapValue(String? value) {

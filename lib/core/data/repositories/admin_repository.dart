@@ -264,6 +264,23 @@ class AdminRepository {
     await _db.from('digital_cards').update(card.toJson()).eq('id', card.id);
   }
 
+  static Future<void> updateCardActivation({
+    required String cardId,
+    required bool isActive,
+    String? reason,
+  }) async {
+    final currentUser = _db.auth.currentUser;
+    await _db
+        .from('digital_cards')
+        .update({
+          'is_active': isActive,
+          'deactivated_at': isActive ? null : DateTime.now().toIso8601String(),
+          'deactivation_reason': isActive ? null : reason,
+          'deactivated_by': isActive ? null : currentUser?.id,
+        })
+        .eq('id', cardId);
+  }
+
   static Future<void> deactivateUser(String userId) async {
     await _db.from('users').update({'is_active': false}).eq('id', userId);
   }

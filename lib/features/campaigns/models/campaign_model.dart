@@ -74,17 +74,6 @@ extension CampaignFieldTypeExt on CampaignFieldType {
   }
 }
 
-CampaignStatus _statusFromString(String s) {
-  switch (s) {
-    case 'active':
-      return CampaignStatus.active;
-    case 'finished':
-      return CampaignStatus.finished;
-    default:
-      return CampaignStatus.upcoming;
-  }
-}
-
 CampaignObjective? _objectiveFromString(String? value) {
   for (final objective in CampaignObjective.values) {
     if (objective.name == value) return objective;
@@ -226,23 +215,37 @@ class CampaignModel {
     final parsedDescription = _parseDescriptionPayload(
       json['description'] as String?,
     );
+    final startsAt = _parseTimestamp(json['starts_at']);
+    final endsAt = _parseTimestamp(json['ends_at']);
+    final derivedEventDate =
+        startsAt ??
+        (json['event_date'] != null
+            ? DateTime.tryParse(json['event_date'] as String)
+            : null) ??
+        DateTime.now();
     return CampaignModel(
       id: json['id'] as String,
       orgId: json['org_id'] as String?,
       name: json['name'] as String? ?? '',
       eventType: json['event_type'] as String?,
-      eventDate: json['event_date'] != null
-          ? DateTime.tryParse(json['event_date'] as String) ?? DateTime.now()
-          : DateTime.now(),
+      eventDate: DateTime(
+        derivedEventDate.year,
+        derivedEventDate.month,
+        derivedEventDate.day,
+      ),
       location: json['location'] as String? ?? 'Por definir',
       description: parsedDescription.description,
-      status: _statusFromString(json['status'] as String? ?? 'upcoming'),
+      status: _deriveCampaignStatus(startsAt, endsAt),
       taps: (json['taps'] as num?)?.toInt() ?? 0,
       leads: (json['leads'] as num?)?.toInt() ?? 0,
       conversions: (json['conversions'] as num?)?.toInt() ?? 0,
       zone: parsedDescription.zone,
-      startTime: parsedDescription.startTime,
-      endTime: parsedDescription.endTime,
+      startTime: startsAt != null
+          ? _formatTimeValue(startsAt)
+          : parsedDescription.startTime,
+      endTime: endsAt != null
+          ? _formatTimeValue(endsAt)
+          : parsedDescription.endTime,
       durationMinutes: parsedDescription.durationMinutes,
       shiftNotes: parsedDescription.shiftNotes,
       objective: parsedDescription.objective,
@@ -259,12 +262,16 @@ class CampaignModel {
     'name': name,
     if (eventType != null) 'event_type': eventType,
     'event_date': eventDate.toIso8601String().substring(0, 10),
+    'starts_at': _buildCampaignDateTime(
+      eventDate,
+      startTime,
+    )?.toUtc().toIso8601String(),
+    'ends_at': _buildCampaignDateTime(
+      eventDate,
+      endTime,
+    )?.toUtc().toIso8601String(),
     'location': location,
     'description': _encodeDescriptionPayload(),
-    'status': status.name,
-    'taps': taps,
-    'leads': leads,
-    'conversions': conversions,
   };
 
   CampaignModel copyWith({
@@ -425,4 +432,35 @@ _CampaignDescriptionPayload _parseDescriptionPayload(String? raw) {
   } catch (_) {
     return _CampaignDescriptionPayload(description: raw);
   }
+}
+
+DateTime? _parseTimestamp(dynamic value) {
+  if (value == null) return null;
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return null;
+  return DateTime.tryParse(raw)?.toLocal();
+}
+
+String _formatTimeValue(DateTime value) {
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
+}
+
+DateTime? _buildCampaignDateTime(DateTime date, String? time) {
+  if (time == null || time.trim().isEmpty) return null;
+  final parts = time.split(':');
+  if (parts.length < 2) return null;
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+  if (hour == null || minute == null) return null;
+  return DateTime(date.year, date.month, date.day, hour, minute);
+}
+
+CampaignStatus _deriveCampaignStatus(DateTime? startsAt, DateTime? endsAt) {
+  final now = DateTime.now();
+  if (startsAt == null || endsAt == null) return CampaignStatus.upcoming;
+  if (now.isBefore(startsAt)) return CampaignStatus.upcoming;
+  if (now.isAfter(endsAt)) return CampaignStatus.finished;
+  return CampaignStatus.active;
 }

@@ -162,8 +162,13 @@ class _AuthGateState extends State<_AuthGate> {
       return;
     }
     appState.setUser(user);
-    final card = await AuthService.fetchUserCard(user.id);
-    appState.setCard(card);
+    appState.setLoadingCard(true);
+    try {
+      final card = await AuthService.fetchUserCard(user.id);
+      appState.setCard(card);
+    } finally {
+      appState.setLoadingCard(false);
+    }
   }
 
   Future<void> _bootstrap() async {

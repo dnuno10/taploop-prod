@@ -33,9 +33,15 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   void _loadCardIfMissing() async {
+    if (appState.loadingCard) return;
     if (appState.currentCard == null && appState.currentUser != null) {
-      final card = await AuthService.fetchUserCard(appState.currentUser!.id);
-      if (mounted) appState.setCard(card);
+      appState.setLoadingCard(true);
+      try {
+        final card = await AuthService.fetchUserCard(appState.currentUser!.id);
+        if (mounted) appState.setCard(card);
+      } finally {
+        if (mounted) appState.setLoadingCard(false);
+      }
     }
   }
 

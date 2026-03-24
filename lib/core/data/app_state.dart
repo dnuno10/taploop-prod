@@ -8,11 +8,13 @@ class AppState extends ChangeNotifier {
   UserModel? _currentUser;
   DigitalCardModel? _currentCard;
   bool _loadingUser = false;
+  bool _loadingCard = false;
   String? _error;
 
   UserModel? get currentUser => _currentUser;
   DigitalCardModel? get currentCard => _currentCard;
   bool get loadingUser => _loadingUser;
+  bool get loadingCard => _loadingCard;
   String? get error => _error;
   bool get isAuthenticated => _currentUser != null;
 
@@ -37,6 +39,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setLoadingCard(bool v) {
+    _loadingCard = v;
+    notifyListeners();
+  }
+
   void setError(String? e) {
     _error = e;
     notifyListeners();
@@ -45,6 +52,8 @@ class AppState extends ChangeNotifier {
   void clear() {
     _currentUser = null;
     _currentCard = null;
+    _loadingUser = false;
+    _loadingCard = false;
     _error = null;
     notifyListeners();
   }

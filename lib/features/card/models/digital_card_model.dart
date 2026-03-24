@@ -98,6 +98,9 @@ class DigitalCardModel {
   // Meta
   final String publicSlug;
   final bool isActive;
+  final DateTime? deactivatedAt;
+  final String? deactivationReason;
+  final String? deactivatedBy;
   final DateTime? updatedAt;
 
   const DigitalCardModel({
@@ -125,6 +128,9 @@ class DigitalCardModel {
     required this.socialLinks,
     required this.publicSlug,
     this.isActive = true,
+    this.deactivatedAt,
+    this.deactivationReason,
+    this.deactivatedBy,
     this.updatedAt,
   });
 
@@ -149,6 +155,11 @@ class DigitalCardModel {
       bio: json['bio'] as String?,
       publicSlug: json['public_slug'] as String? ?? '',
       isActive: json['is_active'] as bool? ?? true,
+      deactivatedAt: json['deactivated_at'] != null
+          ? DateTime.tryParse(json['deactivated_at'] as String)
+          : null,
+      deactivationReason: json['deactivation_reason'] as String?,
+      deactivatedBy: json['deactivated_by'] as String?,
       themeStyle: _themeStyleFromString(
         json['theme_style'] as String? ?? 'white',
       ),
@@ -188,6 +199,9 @@ class DigitalCardModel {
     if (bio != null) 'bio': bio,
     'public_slug': publicSlug,
     'is_active': isActive,
+    'deactivated_at': deactivatedAt?.toIso8601String(),
+    'deactivation_reason': deactivationReason,
+    'deactivated_by': deactivatedBy,
     'theme_style': themeStyle.name,
     'layout_style': layoutStyle.name,
     'primary_color': primaryColor.value,
@@ -232,6 +246,9 @@ class DigitalCardModel {
     List<SocialLinkModel>? socialLinks,
     String? publicSlug,
     bool? isActive,
+    DateTime? deactivatedAt,
+    String? deactivationReason,
+    String? deactivatedBy,
     DateTime? updatedAt,
   }) {
     return DigitalCardModel(
@@ -259,6 +276,9 @@ class DigitalCardModel {
       socialLinks: socialLinks ?? this.socialLinks,
       publicSlug: publicSlug ?? this.publicSlug,
       isActive: isActive ?? this.isActive,
+      deactivatedAt: deactivatedAt ?? this.deactivatedAt,
+      deactivationReason: deactivationReason ?? this.deactivationReason,
+      deactivatedBy: deactivatedBy ?? this.deactivatedBy,
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
