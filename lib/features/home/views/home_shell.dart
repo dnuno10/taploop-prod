@@ -137,6 +137,10 @@ class _DesktopShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = appState.currentUser;
+    final profilePhotoUrl =
+        appState.currentCard?.profilePhotoUrl?.trim().isNotEmpty == true
+        ? appState.currentCard!.profilePhotoUrl
+        : user?.photoUrl;
     final jobTitle = user?.jobTitle?.trim();
 
     return Scaffold(
@@ -174,7 +178,7 @@ class _DesktopShell extends StatelessWidget {
                         children: [
                           _AvatarBadge(
                             initials: user?.initials ?? 'TL',
-                            photoUrl: user?.photoUrl,
+                            photoUrl: profilePhotoUrl,
                             radius: 22,
                           ),
                           const SizedBox(width: 12),

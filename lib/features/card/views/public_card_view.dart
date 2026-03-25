@@ -9,6 +9,7 @@ import '../../../core/data/repositories/card_repository.dart';
 import '../../../core/data/repositories/analytics_repository.dart';
 import '../../../core/data/repositories/lead_repository.dart';
 import '../../../core/utils/visitor_info.dart';
+import '../../../core/widgets/remote_brand_logo.dart';
 import '../../../core/widgets/platform_icon.dart';
 import '../models/digital_card_model.dart';
 import '../models/contact_item_model.dart';
@@ -67,25 +68,26 @@ class _PublicCardViewState extends State<PublicCardView> {
         } else {
           card = await CardRepository.fetchBySlug(widget.slug!);
         }
-        if (mounted)
+        if (mounted) {
           setState(() {
             _card = card;
             _notFound = card == null;
             _loading = false;
           });
+        }
         if (card != null && card.isActive) {
           final source = (widget.via == 'qr') ? 'qr' : 'link';
           AnalyticsRepository.recordVisit(card.id, source);
         }
       }
     } catch (e) {
-      print('[PublicCardView] Error: $e');
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _notFound = true;
           _errorDetail = e.toString();
         });
+      }
     }
   }
 
@@ -108,12 +110,13 @@ class _PublicCardViewState extends State<PublicCardView> {
     }
     // assigned — load the card
     final card = await CardRepository.fetchByNfcSerial(widget.nfcSerial!);
-    if (mounted)
+    if (mounted) {
       setState(() {
         _card = card;
         _nfcState = _NfcState.showCard;
         _loading = false;
       });
+    }
     if (card != null && card.isActive) {
       AnalyticsRepository.recordVisit(card.id, 'nfc');
     }
@@ -142,11 +145,12 @@ class _PublicCardViewState extends State<PublicCardView> {
         });
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _activationError = e.toString();
           _activating = false;
         });
+      }
     }
   }
 
@@ -587,10 +591,9 @@ class _HeroHeader extends StatelessWidget {
                         horizontal: 12,
                         vertical: 6,
                       ),
-                      child: Image.network(
-                        card.companyLogoUrl!,
+                      child: RemoteBrandLogo(
+                        imageUrl: card.companyLogoUrl!,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
                     ),
                 ],
@@ -718,11 +721,9 @@ class _BannerHeader extends StatelessWidget {
                               horizontal: 8,
                               vertical: 4,
                             ),
-                            child: Image.network(
-                              card.companyLogoUrl!,
+                            child: RemoteBrandLogo(
+                              imageUrl: card.companyLogoUrl!,
                               fit: BoxFit.contain,
-                              errorBuilder: (_, __, ___) =>
-                                  const SizedBox.shrink(),
                             ),
                           ),
                       ],
@@ -850,10 +851,9 @@ class _MinimalHeader extends StatelessWidget {
                         horizontal: 10,
                         vertical: 5,
                       ),
-                      child: Image.network(
-                        card.companyLogoUrl!,
+                      child: RemoteBrandLogo(
+                        imageUrl: card.companyLogoUrl!,
                         fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                       ),
                     ),
                 ],
@@ -1537,12 +1537,13 @@ class _FormCardState extends State<_FormCard> {
         cardId: widget.card.id,
         formId: widget.form.id,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _submitted = true;
           _alreadySubmittedOnDevice = true;
           _submitting = false;
         });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _submitting = false);

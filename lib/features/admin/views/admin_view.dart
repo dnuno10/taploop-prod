@@ -763,10 +763,7 @@ class _CompanyHeaderState extends State<_CompanyHeader> {
       final currentCard = appState.currentCard;
       if (updatedLogoUrl != null &&
           currentCard != null &&
-          currentCard.orgId == orgId &&
-          (currentCard.companyLogoUrl == null ||
-              currentCard.companyLogoUrl!.isEmpty ||
-              currentCard.companyLogoUrl == _organizationLogoUrl)) {
+          currentCard.orgId == orgId) {
         appState.updateCard(
           currentCard.copyWith(companyLogoUrl: updatedLogoUrl),
         );

@@ -14,8 +14,10 @@ import '../../../core/data/app_state.dart';
 import '../../../core/data/repositories/analytics_repository.dart';
 import '../../../core/services/metrics_realtime_service.dart';
 import '../../../core/widgets/card_initial_setup_state.dart';
+import '../../../core/widgets/remote_brand_logo.dart';
 import '../../analytics/models/analytics_summary_model.dart';
 import '../models/contact_item_model.dart';
+import '../models/digital_card_model.dart';
 import '../widgets/qr_code_widget.dart';
 
 class ShareCardView extends StatefulWidget {
@@ -113,78 +115,85 @@ class _ShareCardViewState extends State<ShareCardView> {
 
   @override
   Widget build(BuildContext context) {
-    final isMobile = Responsive.isMobile(context);
-    final isDesktop = Responsive.isDesktop(context);
-    final effectiveQrColor = _qrColor == AppColors.black && context.isDark
-        ? Colors.white
-        : _qrColor;
-    final hasLinkedCard = appState.currentCard != null;
+    return ListenableBuilder(
+      listenable: appState,
+      builder: (context, _) {
+        final isMobile = Responsive.isMobile(context);
+        final isDesktop = Responsive.isDesktop(context);
+        final effectiveQrColor = _qrColor == AppColors.black && context.isDark
+            ? Colors.white
+            : _qrColor;
+        final hasLinkedCard = appState.currentCard != null;
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Container(
-              color: context.bgCard,
-              padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Compartir',
-                    style: GoogleFonts.outfit(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      color: context.textPrimary,
-                    ),
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: Container(
+                  color: context.bgCard,
+                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Compartir',
+                        style: GoogleFonts.outfit(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: context.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Distribuye tu tarjeta digital, QR y contacto desde un centro único.',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 13,
+                          color: context.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Distribuye tu tarjeta digital, QR y contacto desde un centro único.',
-                    style: GoogleFonts.dmSans(
-                      fontSize: 13,
-                      color: context.textSecondary,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+              SliverToBoxAdapter(
+                child: hasLinkedCard
+                    ? (isDesktop
+                          ? _DesktopLayout(
+                              linkCopied: _linkCopied,
+                              onCopy: _copyLink,
+                              qrColor: effectiveQrColor,
+                              qrPalette: _qrPalette,
+                              onQrColorChanged: (c) =>
+                                  setState(() => _qrColor = c),
+                              analytics: _analytics,
+                            )
+                          : _MobileLayout(
+                              linkCopied: _linkCopied,
+                              onCopy: _copyLink,
+                              isMobile: isMobile,
+                              qrColor: effectiveQrColor,
+                              qrPalette: _qrPalette,
+                              onQrColorChanged: (c) =>
+                                  setState(() => _qrColor = c),
+                              analytics: _analytics,
+                            ))
+                    : Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          isDesktop ? 64 : 20,
+                          28,
+                          isDesktop ? 64 : 20,
+                          36,
+                        ),
+                        child: CardInitialSetupState(
+                          onLinked: () => setState(() {}),
+                        ),
+                      ),
+              ),
+            ],
           ),
-          SliverToBoxAdapter(
-            child: hasLinkedCard
-                ? (isDesktop
-                      ? _DesktopLayout(
-                          linkCopied: _linkCopied,
-                          onCopy: _copyLink,
-                          qrColor: effectiveQrColor,
-                          qrPalette: _qrPalette,
-                          onQrColorChanged: (c) => setState(() => _qrColor = c),
-                          analytics: _analytics,
-                        )
-                      : _MobileLayout(
-                          linkCopied: _linkCopied,
-                          onCopy: _copyLink,
-                          isMobile: isMobile,
-                          qrColor: effectiveQrColor,
-                          qrPalette: _qrPalette,
-                          onQrColorChanged: (c) => setState(() => _qrColor = c),
-                          analytics: _analytics,
-                        ))
-                : Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      isDesktop ? 64 : 20,
-                      28,
-                      isDesktop ? 64 : 20,
-                      36,
-                    ),
-                    child: CardInitialSetupState(
-                      onLinked: () => setState(() {}),
-                    ),
-                  ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -354,6 +363,7 @@ class _CardHeroSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final a = analytics;
+    final card = appState.currentCard;
     final isDesktop = Responsive.isDesktop(context);
     return Padding(
       padding: EdgeInsets.fromLTRB(hPad, 0, hPad, 0),
@@ -378,7 +388,7 @@ class _CardHeroSection extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
-          const Center(child: _MinimalCardPreview(width: 280)),
+          Center(child: _MinimalCardPreview(card: card, width: 280)),
           const SizedBox(height: 24),
           Row(
             children: [
@@ -459,14 +469,16 @@ class _CardHeroSection extends StatelessWidget {
 // ─── Minimal Card Preview ────────────────────────────────────────────────────
 
 class _MinimalCardPreview extends StatelessWidget {
+  final DigitalCardModel? card;
   final double width;
-  const _MinimalCardPreview({this.width = 280});
+  const _MinimalCardPreview({required this.card, this.width = 280});
 
   double get height => width * (54 / 85.6); // CR80 ratio
 
   @override
   Widget build(BuildContext context) {
-    final card = appState.currentCard;
+    final logoUrl = card?.companyLogoUrl;
+    final companyName = card?.company ?? '';
     return Container(
       width: width,
       height: height,
@@ -487,19 +499,15 @@ class _MinimalCardPreview extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                if (card?.companyLogoUrl != null &&
-                    card!.companyLogoUrl!.isNotEmpty)
-                  Image.network(
-                    card.companyLogoUrl!,
+                if (logoUrl != null && logoUrl.isNotEmpty)
+                  RemoteBrandLogo(
+                    imageUrl: logoUrl,
                     height: height * 0.30,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   )
                 else
                   Text(
-                    card?.company.isNotEmpty == true
-                        ? card!.company
-                        : 'TapLoop',
+                    companyName.isNotEmpty ? companyName : 'TapLoop',
                     style: GoogleFonts.outfit(
                       fontSize: height * 0.15,
                       fontWeight: FontWeight.w800,
