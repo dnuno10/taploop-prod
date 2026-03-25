@@ -277,10 +277,10 @@ class _EditCardViewState extends State<EditCardView>
   Future<void> _onSave() async {
     if (_saving) return;
     if (_card.id.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No hay tarjeta activa. Recarga la página.'),
-        ),
+      TapLoopToast.show(
+        context,
+        'No hay tarjeta activa. Recarga la página.',
+        TapLoopToastType.error,
       );
       return;
     }
@@ -293,13 +293,20 @@ class _EditCardViewState extends State<EditCardView>
           _saving = false;
           _unsaved = false;
         });
+        TapLoopToast.show(
+          context,
+          'Cambios guardados correctamente.',
+          TapLoopToastType.success,
+        );
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() => _saving = false);
-        ScaffoldMessenger.of(
+        TapLoopToast.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error al guardar: $e')));
+          'No se pudieron guardar los cambios. Intenta de nuevo.',
+          TapLoopToastType.warning,
+        );
       }
     }
   }
@@ -369,12 +376,19 @@ class _EditCardViewState extends State<EditCardView>
             contactItems: [..._card.contactItems, saved],
           ),
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
+        TapLoopToast.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error al añadir contacto: $e')));
+          'Contacto añadido correctamente.',
+          TapLoopToastType.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'No se pudo añadir el contacto. Intenta de nuevo.',
+          TapLoopToastType.warning,
+        );
       }
     }
   }
@@ -390,12 +404,19 @@ class _EditCardViewState extends State<EditCardView>
                 .toList(),
           ),
         );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
+        TapLoopToast.show(
           context,
-        ).showSnackBar(SnackBar(content: Text('Error al editar contacto: $e')));
+          'Contacto actualizado correctamente.',
+          TapLoopToastType.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'No se pudo actualizar el contacto. Intenta de nuevo.',
+          TapLoopToastType.warning,
+        );
       }
     }
   }
@@ -465,11 +486,18 @@ class _EditCardViewState extends State<EditCardView>
             socialLinks: [..._card.socialLinks, saved],
           ),
         );
+        TapLoopToast.show(
+          context,
+          'Red social añadida correctamente.',
+          TapLoopToastType.success,
+        );
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al añadir red social: $e')),
+        TapLoopToast.show(
+          context,
+          'No se pudo añadir la red social. Intenta de nuevo.',
+          TapLoopToastType.warning,
         );
       }
     }
@@ -486,11 +514,18 @@ class _EditCardViewState extends State<EditCardView>
                 .toList(),
           ),
         );
+        TapLoopToast.show(
+          context,
+          'Red social actualizada correctamente.',
+          TapLoopToastType.success,
+        );
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al editar red social: $e')),
+        TapLoopToast.show(
+          context,
+          'No se pudo actualizar la red social. Intenta de nuevo.',
+          TapLoopToastType.warning,
         );
       }
     }
@@ -526,11 +561,20 @@ class _EditCardViewState extends State<EditCardView>
         }
       }
       await CardRepository.reorderContactItems(newItems);
-    } catch (e) {
+      if (mounted && newItems.length < oldItems.length) {
+        TapLoopToast.show(
+          context,
+          'Contacto eliminado.',
+          TapLoopToastType.success,
+        );
+      }
+    } catch (_) {
       if (mounted) {
         setState(() => _card = _card.copyWith(contactItems: oldItems));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar contacto: $e')),
+        TapLoopToast.show(
+          context,
+          'No se pudieron actualizar los contactos. Intenta de nuevo.',
+          TapLoopToastType.warning,
         );
       }
     }
@@ -566,11 +610,20 @@ class _EditCardViewState extends State<EditCardView>
         }
       }
       await CardRepository.reorderSocialLinks(newLinks);
-    } catch (e) {
+      if (mounted && newLinks.length < oldLinks.length) {
+        TapLoopToast.show(
+          context,
+          'Red social eliminada.',
+          TapLoopToastType.success,
+        );
+      }
+    } catch (_) {
       if (mounted) {
         setState(() => _card = _card.copyWith(socialLinks: oldLinks));
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al actualizar red social: $e')),
+        TapLoopToast.show(
+          context,
+          'No se pudieron actualizar las redes sociales. Intenta de nuevo.',
+          TapLoopToastType.warning,
         );
       }
     }
@@ -3266,8 +3319,25 @@ class _FormulariosTabState extends State<_FormulariosTab> {
       ),
     );
     if (created == null || created.isEmpty) return;
-    await CardRepository.createSmartForm(widget.cardId, created);
-    await _loadForms();
+    try {
+      await CardRepository.createSmartForm(widget.cardId, created);
+      await _loadForms();
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'Formulario creado correctamente.',
+          TapLoopToastType.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'No se pudo crear el formulario. Intenta de nuevo.',
+          TapLoopToastType.warning,
+        );
+      }
+    }
   }
 
   @override
@@ -3382,13 +3452,47 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
       ),
     );
     if (name == null || name.isEmpty) return;
-    await CardRepository.updateSmartForm(widget.form.copyWith(name: name));
-    widget.onChanged();
+    try {
+      await CardRepository.updateSmartForm(widget.form.copyWith(name: name));
+      widget.onChanged();
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'Formulario actualizado correctamente.',
+          TapLoopToastType.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'No se pudo actualizar el formulario. Intenta de nuevo.',
+          TapLoopToastType.warning,
+        );
+      }
+    }
   }
 
   Future<void> _deleteForm() async {
-    await CardRepository.deleteSmartForm(widget.form.id);
-    widget.onChanged();
+    try {
+      await CardRepository.deleteSmartForm(widget.form.id);
+      widget.onChanged();
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'Formulario eliminado.',
+          TapLoopToastType.success,
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'No se pudo eliminar el formulario. Intenta de nuevo.',
+          TapLoopToastType.warning,
+        );
+      }
+    }
   }
 
   Future<void> _addField() async {
