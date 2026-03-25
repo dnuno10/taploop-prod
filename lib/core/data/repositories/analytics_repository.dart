@@ -47,6 +47,9 @@ class AnalyticsRepository {
     final totalVisits = rangeEvents.length;
     final totalTaps = rangeEvents.where((e) => e.source == 'nfc').length;
     final totalQrScans = rangeEvents.where((e) => e.source == 'qr').length;
+    final clickEvents = rangeEvents
+        .where((e) => e.source == 'contact' || e.source == 'social')
+        .toList();
 
     final visitsThisWeek = rangeEvents.length;
     final visitsLastWeek = events
@@ -70,26 +73,31 @@ class AnalyticsRepository {
           .length;
     });
 
-    // Link stats
-    final linkStatsRaw = await _db
-        .from('link_stats')
-        .select()
-        .eq('card_id', cardId)
-        .order('clicks', ascending: false);
+    final totalClicks = clickEvents.length;
+    final groupedClicks = <String, int>{};
+    final groupedPlatforms = <String, String>{};
 
-    final totalClicks = (linkStatsRaw as List).fold<int>(
-      0,
-      (sum, e) => sum + ((e as Map)['clicks'] as num? ?? 0).toInt(),
-    );
+    for (final event in clickEvents) {
+      final label = (event.label?.trim().isNotEmpty ?? false)
+          ? event.label!.trim()
+          : (event.source == 'contact' ? 'Contacto' : 'Red social');
+      groupedClicks[label] = (groupedClicks[label] ?? 0) + 1;
+      groupedPlatforms[label] = event.source ?? '';
+    }
 
-    final linkStats = (linkStatsRaw as List)
-        .map(
-          (e) => LinkStatModel.fromJson(
-            e,
-            totalClicks: totalClicks > 0 ? totalClicks : 1,
-          ),
-        )
-        .toList();
+    final linkStats =
+        groupedClicks.entries
+            .map(
+              (entry) => LinkStatModel(
+                linkId: entry.key,
+                label: entry.key,
+                platform: groupedPlatforms[entry.key] ?? '',
+                clicks: entry.value,
+                percentage: totalClicks > 0 ? entry.value / totalClicks : 0,
+              ),
+            )
+            .toList()
+          ..sort((a, b) => b.clicks.compareTo(a.clicks));
 
     // Recent 10 events within range
     final recentEvents = rangeEvents.take(10).toList();

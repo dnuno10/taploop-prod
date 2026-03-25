@@ -34,6 +34,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
   AnalyticsSummaryModel? _analytics;
   bool _loading = true;
   late DateTimeRange _range;
+  int _loadVersion = 0;
   String? _loadedCardId;
   MetricsRealtimeSubscription? _metricsRealtime;
   String? _realtimeCardId;
@@ -78,6 +79,8 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
 
   Future<void> _load() async {
     final cardId = appState.currentCard?.id;
+    final range = _range;
+    final loadVersion = ++_loadVersion;
     if (cardId == null) {
       _loadedCardId = null;
       if (mounted) setState(() => _loading = false);
@@ -86,23 +89,22 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
     try {
       final data = await AnalyticsRepository.fetchSummary(
         cardId,
-        from: _range.start,
-        to: _range.end,
+        from: range.start,
+        to: range.end,
       );
-      if (mounted) {
-        setState(() {
-          _loadedCardId = cardId;
-          _analytics = data;
-          _loading = false;
-        });
-      }
+      if (!mounted || loadVersion != _loadVersion) return;
+      setState(() {
+        _loadedCardId = cardId;
+        _analytics = data;
+        _loading = false;
+      });
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _loadedCardId = cardId;
-          _loading = false;
-        });
-      }
+      if (!mounted || loadVersion != _loadVersion) return;
+      setState(() {
+        _loadedCardId = cardId;
+        _analytics = null;
+        _loading = false;
+      });
     }
   }
 
@@ -117,6 +119,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
     if (picked == null || !mounted) return;
     setState(() {
       _range = picked;
+      _analytics = null;
       _loading = true;
     });
     _load();
