@@ -245,9 +245,11 @@ class CardRepository {
   }) async {
     final hydratedJson = Map<String, dynamic>.from(cardJson);
     hydratedJson.remove('company_logo_url');
-    final orgLogoUrl = await fetchOrganizationLogoUrl(
-      hydratedJson['org_id'] as String?,
-    );
+    final resolvedOrgId = await resolveCardOrganizationId(hydratedJson);
+    if (resolvedOrgId != null && resolvedOrgId.isNotEmpty) {
+      hydratedJson['org_id'] = resolvedOrgId;
+    }
+    final orgLogoUrl = await fetchOrganizationLogoUrl(resolvedOrgId);
     if (orgLogoUrl != null && orgLogoUrl.isNotEmpty) {
       hydratedJson['company_logo'] = orgLogoUrl;
     } else {
@@ -270,6 +272,25 @@ class CardRepository {
         .limit(1);
     if ((rows as List).isEmpty) return null;
     return resolveCompanyLogoUrl(rows.first['company_logo'] as String?);
+  }
+
+  static Future<String?> resolveCardOrganizationId(
+    Map<String, dynamic> cardJson,
+  ) async {
+    final directOrgId = (cardJson['org_id'] as String?)?.trim();
+    if (directOrgId != null && directOrgId.isNotEmpty) {
+      return directOrgId;
+    }
+    final userId = (cardJson['user_id'] as String?)?.trim();
+    if (userId == null || userId.isEmpty) return null;
+
+    final rows = await _db
+        .from('users')
+        .select('org_id')
+        .eq('id', userId)
+        .limit(1);
+    if ((rows as List).isEmpty) return null;
+    return (rows.first['org_id'] as String?)?.trim();
   }
 
   static String? resolveCompanyLogoUrl(String? storedValue) {
