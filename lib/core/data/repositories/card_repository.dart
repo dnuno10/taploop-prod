@@ -244,6 +244,12 @@ class CardRepository {
     List<SocialLinkModel> socialLinks = const [],
   }) async {
     final hydratedJson = Map<String, dynamic>.from(cardJson);
+    final resolvedCardLogoUrl = resolveCompanyLogoUrl(
+      hydratedJson['company_logo_url'] as String?,
+    );
+    if (resolvedCardLogoUrl != null && resolvedCardLogoUrl.isNotEmpty) {
+      hydratedJson['company_logo_url'] = resolvedCardLogoUrl;
+    }
     final orgLogoUrl = await fetchOrganizationLogoUrl(
       hydratedJson['org_id'] as String?,
     );
@@ -273,7 +279,15 @@ class CardRepository {
     final value = storedValue?.trim();
     if (value == null || value.isEmpty) return null;
     if (value.startsWith('http://') || value.startsWith('https://')) {
-      return value;
+      return value.replaceFirst(
+        '/storage/v1/object/public/logos/',
+        '/storage/v1/object/public/company-logos/',
+      );
+    }
+    if (value.startsWith('logos/')) {
+      return _db.storage
+          .from('company-logos')
+          .getPublicUrl(value.replaceFirst('logos/', ''));
     }
     return _db.storage.from('company-logos').getPublicUrl(value);
   }

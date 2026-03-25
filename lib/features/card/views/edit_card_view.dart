@@ -1547,7 +1547,7 @@ class _LogoPickerState extends State<_LogoPicker> {
       final path = '$userId/$cardId/logo.$ext';
 
       await SupabaseService.client.storage
-          .from('logos')
+          .from('company-logos')
           .uploadBinary(
             path,
             bytes,
@@ -1555,7 +1555,7 @@ class _LogoPickerState extends State<_LogoPicker> {
           );
 
       final rawUrl = SupabaseService.client.storage
-          .from('logos')
+          .from('company-logos')
           .getPublicUrl(path);
       final url = '$rawUrl?t=${DateTime.now().millisecondsSinceEpoch}';
 

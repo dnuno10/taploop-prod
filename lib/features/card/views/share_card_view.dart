@@ -707,8 +707,6 @@ class _QrSectionState extends State<_QrSection> {
                     : '',
                 size: 200,
                 foregroundColor: widget.qrColor,
-                showLogo: true,
-                embeddedLogoUrl: appState.currentCard?.companyLogoUrl,
               ),
               const SizedBox(height: 12),
               Text(
