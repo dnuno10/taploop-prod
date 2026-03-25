@@ -112,6 +112,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
       firstDate: DateTime(2024),
       lastDate: DateTime.now(),
       initialDateRange: _range,
+      initialEntryMode: DatePickerEntryMode.calendarOnly,
     );
     if (picked == null || !mounted) return;
     setState(() {
