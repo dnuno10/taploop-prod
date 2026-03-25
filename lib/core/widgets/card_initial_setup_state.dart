@@ -21,9 +21,13 @@ class CardInitialSetupState extends StatefulWidget {
 }
 
 class _CardInitialSetupStateState extends State<CardInitialSetupState> {
+  static const String _phoneFallbackMessage =
+      'Si tu computadora no tiene camara, accede desde tu telefono para usar su camara y escanear el QR.';
+
   MobileScannerController? _scannerController;
 
   bool _scannerVisible = false;
+  bool _scannerPaused = false;
   bool _submitting = false;
   bool _hasProcessedScan = false;
   String? _error;
@@ -41,6 +45,7 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
     if (!_usesEmbeddedScanner) {
       setState(() {
         _scannerVisible = true;
+        _scannerPaused = false;
         _error = null;
         _cameraError = null;
         _hasProcessedScan = false;
@@ -60,8 +65,9 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
         if (!mounted) return;
         setState(() {
           _scannerVisible = true;
+          _scannerPaused = true;
           _cameraError =
-              'No se pudo iniciar la camara en este dispositivo o navegador.';
+              'No se pudo iniciar la camara en este dispositivo o navegador. $_phoneFallbackMessage';
           _error = null;
           _hasProcessedScan = false;
         });
@@ -71,6 +77,7 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
 
     setState(() {
       _scannerVisible = true;
+      _scannerPaused = false;
       _error = null;
       _cameraError = null;
       _hasProcessedScan = false;
@@ -81,6 +88,7 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
     _disposeScannerController();
     setState(() {
       _scannerVisible = false;
+      _scannerPaused = false;
       _submitting = false;
       _hasProcessedScan = false;
       _error = null;
@@ -91,6 +99,8 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
   Future<void> _retryScanner() async {
     _disposeScannerController();
     setState(() {
+      _scannerVisible = true;
+      _scannerPaused = false;
       _cameraError = null;
       _error = null;
       _hasProcessedScan = false;
@@ -102,6 +112,17 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
   void _disposeScannerController() {
     _scannerController?.dispose();
     _scannerController = null;
+  }
+
+  void _pauseScannerWithError(String message) {
+    _disposeScannerController();
+    setState(() {
+      _scannerVisible = true;
+      _scannerPaused = true;
+      _submitting = false;
+      _hasProcessedScan = true;
+      _error = message;
+    });
   }
 
   Future<void> _handleBarcode(BarcodeCapture capture) async {
@@ -126,11 +147,7 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
     if (!mounted) return;
 
     if (!result.success) {
-      setState(() {
-        _submitting = false;
-        _hasProcessedScan = false;
-        _error = result.message;
-      });
+      _pauseScannerWithError(result.message);
       return;
     }
 
@@ -140,6 +157,7 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
     ).showSnackBar(SnackBar(content: Text(result.message)));
     setState(() {
       _scannerVisible = false;
+      _scannerPaused = false;
       _submitting = false;
       _hasProcessedScan = false;
       _error = null;
@@ -206,6 +224,16 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
                         color: context.textSecondary,
                         fontSize: 14,
                         height: 1.6,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'En caso de que el dispositivo no tenga camara, accede desde un dispositivo movil.',
+                      style: GoogleFonts.dmSans(
+                        color: context.textSecondary,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        height: 1.45,
                       ),
                     ),
                     const SizedBox(height: 22),
@@ -313,7 +341,13 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _usesEmbeddedScanner
+                  _scannerPaused
+                      ? _ScannerValidationErrorState(
+                          message: _error ?? 'No se pudo validar el QR.',
+                          onRetry: _retryScanner,
+                          onClose: _closeScanner,
+                        )
+                      : _usesEmbeddedScanner
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(20),
                           child: SizedBox(
@@ -346,7 +380,7 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
                                               'La camara no tiene permiso. Permite el acceso a la camara para escanear el QR.',
                                             MobileScannerErrorCode
                                                 .unsupported =>
-                                              'Este dispositivo o navegador no soporta escaneo con camara.',
+                                              'Este dispositivo o navegador no soporta escaneo con camara. $_phoneFallbackMessage',
                                             _ =>
                                               error.errorDetails?.message ??
                                                   error.errorCode.message,
@@ -466,7 +500,7 @@ class _CardInitialSetupStateState extends State<CardInitialSetupState> {
                             ],
                           ),
                         ),
-                  if (_error != null) ...[
+                  if (_error != null && !_scannerPaused) ...[
                     const SizedBox(height: 12),
                     Text(
                       _error!,
@@ -543,22 +577,101 @@ class _ScannerErrorState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FilledButton.tonal(
-                onPressed: onRetry,
-                child: const Text('Reintentar'),
-              ),
-              const SizedBox(width: 10),
-              OutlinedButton(
-                onPressed: onClose,
-                child: const Text('Cerrar lector'),
-              ),
-            ],
-          ),
+          _ScannerActionRow(onRetry: onRetry, onClose: onClose),
         ],
       ),
+    );
+  }
+}
+
+class _ScannerValidationErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final VoidCallback onClose;
+
+  const _ScannerValidationErrorState({
+    required this.message,
+    required this.onRetry,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 220,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: context.bgSubtle,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: context.borderColor),
+      ),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.qr_code_2_rounded, size: 34, color: AppColors.error),
+          const SizedBox(height: 14),
+          Text(
+            'No se pudo validar el QR',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.outfit(
+              color: context.textPrimary,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.dmSans(
+              color: context.textSecondary,
+              fontSize: 13,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _ScannerActionRow(onRetry: onRetry, onClose: onClose),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScannerActionRow extends StatelessWidget {
+  final VoidCallback onRetry;
+  final VoidCallback onClose;
+
+  const _ScannerActionRow({required this.onRetry, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    final buttonStyle = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size(0, 44)),
+      fixedSize: const WidgetStatePropertyAll(null),
+      maximumSize: const WidgetStatePropertyAll(Size(double.infinity, 44)),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      padding: const WidgetStatePropertyAll(
+        EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      ),
+    );
+
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        FilledButton.tonal(
+          onPressed: onRetry,
+          style: buttonStyle,
+          child: const Text('Reintentar'),
+        ),
+        OutlinedButton(
+          onPressed: onClose,
+          style: buttonStyle,
+          child: const Text('Cerrar lector'),
+        ),
+      ],
     );
   }
 }

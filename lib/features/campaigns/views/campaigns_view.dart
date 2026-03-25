@@ -250,7 +250,7 @@ class _CampaignsViewState extends State<CampaignsView> {
     final hasCampaigns = _campaigns.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(

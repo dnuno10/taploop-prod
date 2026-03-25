@@ -22,6 +22,9 @@ class CardQrWebScanner extends StatefulWidget {
 }
 
 class _CardQrWebScannerState extends State<CardQrWebScanner> {
+  static const String _phoneFallbackMessage =
+      'Si tu computadora no tiene camara, accede desde tu telefono para usar su camara y escanear el QR.';
+
   late final String _viewType;
   late final html.VideoElement _videoElement;
   html.MediaStream? _mediaStream;
@@ -68,14 +71,16 @@ class _CardQrWebScannerState extends State<CardQrWebScanner> {
       );
       if (barcodeDetectorCtor == null) {
         _emitError(
-          'Este navegador no soporta escaneo QR en vivo con la camara.',
+          'Este navegador no soporta escaneo QR en vivo con la camara. $_phoneFallbackMessage',
         );
         return;
       }
 
       final mediaDevices = html.window.navigator.mediaDevices;
       if (mediaDevices == null) {
-        _emitError('No fue posible acceder a la camara del navegador.');
+        _emitError(
+          'No fue posible acceder a la camara del navegador. $_phoneFallbackMessage',
+        );
         return;
       }
 
@@ -108,7 +113,7 @@ class _CardQrWebScannerState extends State<CardQrWebScanner> {
       );
     } catch (_) {
       _emitError(
-        'No se pudo abrir la camara. Verifica el permiso del navegador.',
+        'No se pudo abrir la camara. Verifica el permiso del navegador o accede desde tu telefono si este equipo no tiene camara.',
       );
     }
   }

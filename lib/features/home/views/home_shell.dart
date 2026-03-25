@@ -29,7 +29,10 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    _loadCardIfMissing();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadCardIfMissing();
+    });
   }
 
   void _loadCardIfMissing() async {
@@ -137,7 +140,7 @@ class _DesktopShell extends StatelessWidget {
     final jobTitle = user?.jobTitle?.trim();
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: context.bgSubtle,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(18),
@@ -148,7 +151,10 @@ class _DesktopShell extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: context.bgCard,
                   borderRadius: BorderRadius.circular(30),
-                  border: Border.all(color: context.borderColor),
+                  border: Border.all(
+                    color: context.borderStrong.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
                 ),
                 padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
                 child: Column(
@@ -235,36 +241,6 @@ class _DesktopShell extends StatelessWidget {
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: context.bgSubtle,
-                        borderRadius: BorderRadius.circular(22),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'TapLoop',
-                            style: GoogleFonts.outfit(
-                              color: context.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Interfaz clara, ligera y enfocada en el trabajo diario.',
-                            style: GoogleFonts.dmSans(
-                              color: context.textSecondary,
-                              fontSize: 12,
-                              height: 1.45,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
                     TextButton.icon(
                       onPressed: () async {
                         await AuthService.signOut();
@@ -295,9 +271,12 @@ class _DesktopShell extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: context.bgCard,
                     borderRadius: BorderRadius.circular(34),
-                    border: Border.all(color: context.borderColor),
+                    border: Border.all(
+                      color: context.borderStrong.withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
                   ),
-                  clipBehavior: Clip.antiAlias,
+                  clipBehavior: Clip.hardEdge,
                   child: IndexedStack(index: index, children: views),
                 ),
               ),
@@ -323,7 +302,7 @@ class _MobileShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: context.bgSubtle,
       body: SafeArea(
         bottom: false,
         child: Padding(
@@ -334,9 +313,9 @@ class _MobileShell extends StatelessWidget {
               borderRadius: const BorderRadius.vertical(
                 top: Radius.circular(28),
               ),
-              border: Border.all(color: context.borderColor),
+              border: Border.all(color: context.borderStrong, width: 1.5),
             ),
-            clipBehavior: Clip.antiAlias,
+            clipBehavior: Clip.hardEdge,
             child: IndexedStack(index: index, children: views),
           ),
         ),
@@ -347,7 +326,7 @@ class _MobileShell extends StatelessWidget {
           decoration: BoxDecoration(
             color: context.bgCard,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: context.borderColor),
+            border: Border.all(color: context.borderStrong, width: 1.5),
           ),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
           child: BottomNavigationBar(

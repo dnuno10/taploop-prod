@@ -582,7 +582,7 @@ class _EditCardViewState extends State<EditCardView>
     final hasLinkedCard = appState.currentCard != null;
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [
@@ -735,7 +735,7 @@ class _EditCardViewState extends State<EditCardView>
                   ),
                   border: Border.all(color: context.borderColor),
                 ),
-                clipBehavior: Clip.antiAlias,
+                clipBehavior: Clip.hardEdge,
                 child: TabBarView(
                   controller: _tab,
                   physics: const NeverScrollableScrollPhysics(),
@@ -787,7 +787,7 @@ class _EditCardViewState extends State<EditCardView>
                   borderRadius: BorderRadius.circular(28),
                   border: Border.all(color: context.borderColor),
                 ),
-                clipBehavior: Clip.antiAlias,
+                clipBehavior: Clip.hardEdge,
                 child: Column(
                   children: [
                     Expanded(

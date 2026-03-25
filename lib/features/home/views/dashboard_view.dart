@@ -123,7 +123,7 @@ class _DashboardViewState extends State<DashboardView> {
         appState.currentCard == null;
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: _loading || isResolvingCard
             ? const Center(child: CircularProgressIndicator())

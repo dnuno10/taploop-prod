@@ -489,7 +489,7 @@ class _AdminViewState extends State<AdminView> {
       ..sort((a, b) => b.member.leads.compareTo(a.member.leads));
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(

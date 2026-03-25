@@ -20,12 +20,67 @@ import 'features/card/views/public_card_view.dart';
 /// Global theme mode notifier
 /// Test Ivanovich
 final themeModeNotifier = ValueNotifier<ThemeMode>(ThemeMode.light);
+StreamSubscription<AuthState>? _authSubscription;
+bool _syncingAuth = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   usePathUrlStrategy();
   await SupabaseService.initialize();
+  await _bootstrapAppState();
   runApp(const TapLoopApp());
+}
+
+Future<void> _hydrateAuthenticatedState() async {
+  final user = await AuthService.restoreSession();
+  if (user == null) {
+    appState.clear();
+    return;
+  }
+  appState.setUser(user);
+  appState.setLoadingCard(true);
+  try {
+    final card = await AuthService.fetchUserCard(user.id);
+    appState.setCard(card);
+  } finally {
+    appState.setLoadingCard(false);
+  }
+}
+
+Future<void> _bootstrapAppState() async {
+  appState.setLoadingUser(true);
+  try {
+    await _hydrateAuthenticatedState();
+  } catch (_) {
+    appState.setError('No se pudo restaurar la sesión.');
+  } finally {
+    appState.setLoadingUser(false);
+  }
+}
+
+Future<void> _handleAuthState(AuthState state) async {
+  if (_syncingAuth) return;
+
+  if (state.event == AuthChangeEvent.signedOut) {
+    appState.clear();
+    return;
+  }
+
+  final shouldSync =
+      state.event == AuthChangeEvent.signedIn ||
+      state.event == AuthChangeEvent.tokenRefreshed ||
+      state.event == AuthChangeEvent.userUpdated;
+
+  if (!shouldSync) return;
+
+  _syncingAuth = true;
+  try {
+    await _hydrateAuthenticatedState();
+  } catch (_) {
+    // Preserve existing state if there is a transient auth/network issue.
+  } finally {
+    _syncingAuth = false;
+  }
 }
 
 // ─── Router ───────────────────────────────────────────────────────────────────
@@ -104,8 +159,25 @@ final _router = GoRouter(
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
-class TapLoopApp extends StatelessWidget {
+class TapLoopApp extends StatefulWidget {
   const TapLoopApp({super.key});
+
+  @override
+  State<TapLoopApp> createState() => _TapLoopAppState();
+}
+
+class _TapLoopAppState extends State<TapLoopApp> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _authSubscription ??= SupabaseService.authStateChanges.listen((state) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          unawaited(_handleAuthState(state));
+        });
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -125,108 +197,20 @@ class TapLoopApp extends StatelessWidget {
 
 // ─── Auth Gate ────────────────────────────────────────────────────────────────
 
-class _AuthGate extends StatefulWidget {
+class _AuthGate extends StatelessWidget {
   final String? pendingNfc;
 
   const _AuthGate({this.pendingNfc});
 
   @override
-  State<_AuthGate> createState() => _AuthGateState();
-}
-
-class _AuthGateState extends State<_AuthGate> {
-  static bool _didBootstrap = false;
-  late final Future<void> _bootstrapFuture;
-  StreamSubscription<AuthState>? _authSubscription;
-  bool _syncingAuth = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _bootstrapFuture = _bootstrap();
-    _authSubscription = SupabaseService.authStateChanges.listen(
-      _handleAuthState,
-    );
-  }
-
-  @override
-  void dispose() {
-    _authSubscription?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _hydrateAuthenticatedState() async {
-    final user = await AuthService.restoreSession();
-    if (user == null) {
-      appState.clear();
-      return;
-    }
-    appState.setUser(user);
-    appState.setLoadingCard(true);
-    try {
-      final card = await AuthService.fetchUserCard(user.id);
-      appState.setCard(card);
-    } finally {
-      appState.setLoadingCard(false);
-    }
-  }
-
-  Future<void> _bootstrap() async {
-    if (_didBootstrap) return;
-    _didBootstrap = true;
-    appState.setLoadingUser(true);
-    try {
-      await _hydrateAuthenticatedState();
-    } catch (_) {
-      appState.setError('No se pudo restaurar la sesión.');
-    } finally {
-      appState.setLoadingUser(false);
-    }
-  }
-
-  Future<void> _handleAuthState(AuthState state) async {
-    if (_syncingAuth) return;
-
-    if (state.event == AuthChangeEvent.signedOut) {
-      appState.clear();
-      return;
-    }
-
-    final shouldSync =
-        state.event == AuthChangeEvent.initialSession ||
-        state.event == AuthChangeEvent.signedIn ||
-        state.event == AuthChangeEvent.tokenRefreshed ||
-        state.event == AuthChangeEvent.userUpdated;
-
-    if (!shouldSync) return;
-
-    _syncingAuth = true;
-    try {
-      await _hydrateAuthenticatedState();
-    } catch (_) {
-      // Preserve existing state if there is a transient auth/network issue.
-    } finally {
-      _syncingAuth = false;
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return FutureBuilder<void>(
-      future: _bootstrapFuture,
-      builder: (context, snapshot) {
-        final bootstrapping =
-            snapshot.connectionState != ConnectionState.done &&
-            !appState.isAuthenticated;
+    return ListenableBuilder(
+      listenable: appState,
+      builder: (context, _) {
+        final bootstrapping = appState.loadingUser && !appState.isAuthenticated;
         if (bootstrapping) return const _BootstrapView();
-
-        return ListenableBuilder(
-          listenable: appState,
-          builder: (context, _) {
-            if (appState.isAuthenticated) return const HomeShell();
-            return LoginView(pendingNfc: widget.pendingNfc);
-          },
-        );
+        if (appState.isAuthenticated) return const HomeShell();
+        return LoginView(pendingNfc: pendingNfc);
       },
     );
   }

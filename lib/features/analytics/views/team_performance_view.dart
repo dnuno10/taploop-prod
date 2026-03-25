@@ -166,7 +166,7 @@ class _TeamPerformanceViewState extends State<TeamPerformanceView> {
     );
     final hasSelectedMember = selectionPool.isNotEmpty;
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: _loadMembers,
         child: CustomScrollView(

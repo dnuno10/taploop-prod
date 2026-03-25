@@ -121,7 +121,7 @@ class _ShareCardViewState extends State<ShareCardView> {
     final hasLinkedCard = appState.currentCard != null;
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(

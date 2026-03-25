@@ -303,7 +303,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
     final hasLinkedCard = appState.currentCard != null;
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [
@@ -485,7 +485,7 @@ class _AnalyticsTabPanel extends StatelessWidget {
           borderRadius: BorderRadius.circular(28),
           border: Border.all(color: context.borderColor),
         ),
-        clipBehavior: Clip.antiAlias,
+        clipBehavior: Clip.hardEdge,
         child: child,
       ),
     );

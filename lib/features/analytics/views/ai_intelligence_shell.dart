@@ -33,7 +33,7 @@ class _AIIntelligenceShellState extends State<AIIntelligenceShell>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: context.bgCard,
         surfaceTintColor: Colors.transparent,

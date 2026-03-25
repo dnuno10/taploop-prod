@@ -57,7 +57,7 @@ class _SettingsViewState extends State<SettingsView> {
     ].join(' · ');
 
     return Scaffold(
-      backgroundColor: context.bgPage,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         backgroundColor: context.bgCard,
         elevation: 0,
