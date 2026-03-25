@@ -14,6 +14,7 @@ import '../../../core/data/app_state.dart';
 import '../../../core/data/repositories/card_repository.dart';
 import '../../../core/widgets/card_initial_setup_state.dart';
 import '../../../core/widgets/taploop_button.dart';
+import '../../../core/widgets/taploop_toast.dart';
 import '../models/digital_card_model.dart';
 import '../models/social_link_model.dart';
 import '../models/contact_item_model.dart';
@@ -1363,10 +1364,10 @@ class _AvatarPickerState extends State<_AvatarPicker> {
     const tiposPermitidos = ['image/jpeg', 'image/png'];
     if (!tiposPermitidos.contains(file.type)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Solo se permiten imágenes en formato JPG o PNG.'),
-          ),
+        TapLoopToast.show(
+          context,
+          'Solo se permiten imágenes en formato JPG o PNG.',
+          TapLoopToastType.error,
         );
       }
       return;
@@ -1375,8 +1376,10 @@ class _AvatarPickerState extends State<_AvatarPicker> {
     // Validar tamaño
     if (file.size > 5 * 1024 * 1024) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('La imagen supera el límite de 5 MB.')),
+        TapLoopToast.show(
+          context,
+          'La imagen supera el límite de 5 MB.',
+          TapLoopToastType.error,
         );
       }
       return;
@@ -1408,12 +1411,19 @@ class _AvatarPickerState extends State<_AvatarPicker> {
       final url = '$rawUrl?t=${DateTime.now().millisecondsSinceEpoch}';
 
       widget.onPhotoChanged(url);
+      if (mounted) {
+        TapLoopToast.show(
+          context,
+          'Foto de perfil actualizada.',
+          TapLoopToastType.success,
+        );
+      }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo subir la imagen. Intenta de nuevo.'),
-          ),
+        TapLoopToast.show(
+          context,
+          'No se pudo subir la imagen. Intenta de nuevo.',
+          TapLoopToastType.warning,
         );
       }
     } finally {

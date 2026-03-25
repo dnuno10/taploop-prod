@@ -17,6 +17,7 @@ import '../../../core/services/metrics_realtime_service.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/widgets/taploop_button.dart';
 import '../../../core/widgets/taploop_text_field.dart';
+import '../../../core/widgets/taploop_toast.dart';
 import '../../analytics/models/team_member_model.dart';
 import '../../card/models/digital_card_model.dart';
 import '../../card/models/contact_item_model.dart';
@@ -719,18 +720,20 @@ class _CompanyHeaderState extends State<_CompanyHeader> {
     const tiposPermitidos = ['image/jpeg', 'image/png'];
     if (!tiposPermitidos.contains(file.type)) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Solo se permiten imágenes en formato JPG o PNG.'),
-          ),
+        TapLoopToast.show(
+          context,
+          'Solo se permiten imágenes en formato JPG o PNG.',
+          TapLoopToastType.error,
         );
       }
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('La imagen supera el limite de 5 MB.')),
+        TapLoopToast.show(
+          context,
+          'La imagen supera el límite de 5 MB.',
+          TapLoopToastType.error,
         );
       }
       return;
@@ -787,16 +790,18 @@ class _CompanyHeaderState extends State<_CompanyHeader> {
       }
 
       if (mounted) {
-        ScaffoldMessenger.of(
+        TapLoopToast.show(
           context,
-        ).showSnackBar(const SnackBar(content: Text('Logo actualizado.')));
+          'Logo actualizado.',
+          TapLoopToastType.success,
+        );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo subir el logo. Intenta de nuevo.'),
-          ),
+        TapLoopToast.show(
+          context,
+          'No se pudo subir el logo. Intenta de nuevo.',
+          TapLoopToastType.warning,
         );
       }
     } finally {
