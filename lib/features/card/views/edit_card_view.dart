@@ -827,10 +827,6 @@ class _EditCardViewState extends State<EditCardView>
         _card = _card.copyWith(profilePhotoUrl: url);
         _unsaved = true;
       }),
-      onLogoChanged: (url) => setState(() {
-        _card = _card.copyWith(companyLogoUrl: url);
-        _unsaved = true;
-      }),
     ),
     _ContactTab(
       card: _card,
@@ -1237,7 +1233,6 @@ class _ProfileTab extends StatelessWidget {
   final DigitalCardModel card;
   final bool companyLocked;
   final ValueChanged<String> onPhotoChanged;
-  final ValueChanged<String> onLogoChanged;
 
   const _ProfileTab({
     required this.nameCtrl,
@@ -1247,7 +1242,6 @@ class _ProfileTab extends StatelessWidget {
     required this.card,
     required this.companyLocked,
     required this.onPhotoChanged,
-    required this.onLogoChanged,
   });
 
   @override
@@ -1262,10 +1256,6 @@ class _ProfileTab extends StatelessWidget {
             children: [
               _AvatarPicker(card: card, onPhotoChanged: onPhotoChanged),
               const SizedBox(height: 32),
-              Offstage(
-                offstage: true,
-                child: _LogoPicker(card: card, onLogoChanged: onLogoChanged),
-              ),
               Divider(color: context.borderColor, height: 1),
               const SizedBox(height: 28),
               Text(
@@ -1489,166 +1479,6 @@ class _AvatarPickerState extends State<_AvatarPicker> {
             const SizedBox(height: 4),
             Text(
               'JPG, PNG · máx 5 MB',
-              style: GoogleFonts.dmSans(fontSize: 12, color: context.textMuted),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Logo Picker ─────────────────────────────────────────────────────────────
-
-class _LogoPicker extends StatefulWidget {
-  final DigitalCardModel card;
-  final ValueChanged<String> onLogoChanged;
-  const _LogoPicker({required this.card, required this.onLogoChanged});
-
-  @override
-  State<_LogoPicker> createState() => _LogoPickerState();
-}
-
-class _LogoPickerState extends State<_LogoPicker> {
-  bool _uploading = false;
-
-  Future<void> _pickAndUpload() async {
-    if (!kIsWeb) return;
-    final input = html.FileUploadInputElement()
-      ..accept = 'image/jpeg,image/png,image/webp,image/svg+xml';
-    input.click();
-    await input.onChange.first;
-    final file = input.files?.first;
-    if (file == null) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('La imagen supera el limite de 5 MB.')),
-        );
-      }
-      return;
-    }
-
-    setState(() => _uploading = true);
-    try {
-      final reader = html.FileReader();
-      reader.readAsArrayBuffer(file);
-      await reader.onLoad.first;
-      final bytes = reader.result as Uint8List;
-
-      final userId = widget.card.userId ?? 'unknown';
-      final cardId = widget.card.id;
-      final ext = file.type.contains('png')
-          ? 'png'
-          : file.type.contains('svg')
-          ? 'svg'
-          : 'jpg';
-      final path = '$userId/$cardId/logo.$ext';
-
-      await SupabaseService.client.storage
-          .from('company-logos')
-          .uploadBinary(
-            path,
-            bytes,
-            fileOptions: FileOptions(upsert: true, contentType: file.type),
-          );
-
-      final rawUrl = SupabaseService.client.storage
-          .from('company-logos')
-          .getPublicUrl(path);
-      final url = '$rawUrl?t=${DateTime.now().millisecondsSinceEpoch}';
-
-      widget.onLogoChanged(url);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error al subir logo: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _uploading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final logoUrl = widget.card.companyLogoUrl;
-    return Row(
-      children: [
-        GestureDetector(
-          onTap: _uploading ? null : _pickAndUpload,
-          child: Stack(
-            children: [
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  color: context.bgSubtle,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: context.borderColor),
-                  image: logoUrl != null
-                      ? DecorationImage(
-                          image: NetworkImage(logoUrl),
-                          fit: BoxFit.contain,
-                        )
-                      : null,
-                ),
-                child: logoUrl == null
-                    ? Icon(
-                        Icons.business_outlined,
-                        size: 32,
-                        color: context.textMuted,
-                      )
-                    : null,
-              ),
-              Positioned(
-                bottom: 2,
-                right: 2,
-                child: Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: context.textPrimary,
-                    shape: BoxShape.circle,
-                  ),
-                  child: _uploading
-                      ? const Padding(
-                          padding: EdgeInsets.all(5),
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Icon(
-                          Icons.photo_camera,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 20),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTap: _uploading ? null : _pickAndUpload,
-              child: Text(
-                'Subir logo',
-                style: GoogleFonts.outfit(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: context.textPrimary,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'JPG, PNG, SVG · max 5 MB',
               style: GoogleFonts.dmSans(fontSize: 12, color: context.textMuted),
             ),
           ],

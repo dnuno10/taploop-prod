@@ -244,18 +244,14 @@ class CardRepository {
     List<SocialLinkModel> socialLinks = const [],
   }) async {
     final hydratedJson = Map<String, dynamic>.from(cardJson);
-    final resolvedCardLogoUrl = resolveCompanyLogoUrl(
-      hydratedJson['company_logo_url'] as String?,
+    hydratedJson.remove('company_logo_url');
+    final orgLogoUrl = await fetchOrganizationLogoUrl(
+      hydratedJson['org_id'] as String?,
     );
-    if (resolvedCardLogoUrl != null && resolvedCardLogoUrl.isNotEmpty) {
-      hydratedJson['company_logo_url'] = resolvedCardLogoUrl;
+    if (orgLogoUrl != null && orgLogoUrl.isNotEmpty) {
+      hydratedJson['company_logo'] = orgLogoUrl;
     } else {
-      final orgLogoUrl = await fetchOrganizationLogoUrl(
-        hydratedJson['org_id'] as String?,
-      );
-      if (orgLogoUrl != null && orgLogoUrl.isNotEmpty) {
-        hydratedJson['company_logo_url'] = orgLogoUrl;
-      }
+      hydratedJson.remove('company_logo');
     }
 
     return DigitalCardModel.fromJson(

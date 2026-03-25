@@ -305,12 +305,5 @@ class AdminRepository {
         .from('organizations')
         .update({'company_logo': companyLogo})
         .eq('id', orgId);
-    await _db
-        .from('digital_cards')
-        .update({
-          'company_logo_url': companyLogo,
-          'updated_at': DateTime.now().toIso8601String(),
-        })
-        .eq('org_id', orgId);
   }
 }

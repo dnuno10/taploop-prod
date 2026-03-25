@@ -180,7 +180,7 @@ class DigitalCardModel {
           ? DateTime.tryParse(json['updated_at'] as String)
           : null,
       profilePhotoUrl: json['profile_photo_url'] as String?,
-      companyLogoUrl: json['company_logo_url'] as String?,
+      companyLogoUrl: json['company_logo'] as String?,
       enabledForms: (json['enabled_forms'] as List<dynamic>? ?? const [])
           .map((e) => e as String)
           .toList(),
@@ -216,7 +216,6 @@ class DigitalCardModel {
     'calendar_enabled': calendarEnabled,
     if (calendarUrl != null) 'calendar_url': calendarUrl,
     if (profilePhotoUrl != null) 'profile_photo_url': profilePhotoUrl,
-    if (companyLogoUrl != null) 'company_logo_url': companyLogoUrl,
   };
 
   String get publicUrl => 'https://liomont.taploop.com.mx/$publicSlug';
