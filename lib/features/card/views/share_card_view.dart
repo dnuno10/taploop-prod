@@ -16,7 +16,6 @@ import '../../../core/services/metrics_realtime_service.dart';
 import '../../../core/widgets/card_initial_setup_state.dart';
 import '../../../core/widgets/remote_brand_logo.dart';
 import '../../analytics/models/analytics_summary_model.dart';
-import '../models/contact_item_model.dart';
 import '../models/digital_card_model.dart';
 import '../widgets/qr_code_widget.dart';
 
@@ -259,8 +258,6 @@ class _MobileLayout extends StatelessWidget {
                   onQrColorChanged: onQrColorChanged,
                 ),
               ),
-              const SizedBox(height: 24),
-              const _SectionPanel(child: _WalletSection()),
               const SizedBox(height: 52),
             ],
           ),
@@ -340,8 +337,6 @@ class _DesktopLayout extends StatelessWidget {
                         onQrColorChanged: onQrColorChanged,
                       ),
                     ),
-                    const SizedBox(height: 24),
-                    const _SectionPanel(child: _WalletSection()),
                   ],
                 ),
               ),
@@ -1039,119 +1034,6 @@ class _QuickShareButton extends StatelessWidget {
   }
 }
 
-// ─── Wallet Section ───────────────────────────────────────────────────────────
-
-class _WalletSection extends StatefulWidget {
-  const _WalletSection();
-
-  @override
-  State<_WalletSection> createState() => _WalletSectionState();
-}
-
-class _WalletSectionState extends State<_WalletSection> {
-  bool _downloading = false;
-
-  Future<void> _downloadVCard() async {
-    final card = appState.currentCard;
-    if (card == null) return;
-    setState(() => _downloading = true);
-    try {
-      final lines = <String>['BEGIN:VCARD', 'VERSION:3.0'];
-      lines.add('FN:${card.name}');
-      if (card.jobTitle.isNotEmpty) lines.add('TITLE:${card.jobTitle}');
-      if (card.company.isNotEmpty) lines.add('ORG:${card.company}');
-      final visibleContacts =
-          card.contactItems.where((c) => c.isVisible).toList()
-            ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-      for (final c in visibleContacts) {
-        switch (c.type) {
-          case ContactType.phone:
-          case ContactType.whatsapp:
-            lines.add('TEL:${c.value}');
-          case ContactType.email:
-            lines.add('EMAIL:${c.value}');
-          case ContactType.website:
-            lines.add('URL:${c.value}');
-          case ContactType.address:
-            lines.add('ADR:;;${c.value};;;;');
-        }
-      }
-      lines.add('URL:${card.publicUrl}');
-      lines.add('NOTE:Tarjeta digital: ${card.publicUrl}');
-      lines.add('END:VCARD');
-      final vcf = lines.join('\r\n');
-      final blob = html.Blob([vcf], 'text/vcard');
-      final blobUrl = html.Url.createObjectUrlFromBlob(blob);
-      html.AnchorElement(href: blobUrl)
-        ..download = '${card.name.replaceAll(' ', '_')}.vcf'
-        ..click();
-      html.Url.revokeObjectUrl(blobUrl);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al generar contacto: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _downloading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const _SectionHeading(
-          title: 'Guardar contacto',
-          subtitle:
-              'Descarga tu tarjeta en formato compatible para iPhone o Android.',
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: _WalletButton(
-                label: _downloading ? 'Guardando...' : 'Apple Wallet',
-                sublabel: 'Para iPhone',
-                icon: Icons.apple,
-                isPrimary: true,
-                onTap: _downloading ? null : _downloadVCard,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _WalletButton(
-                label: _downloading ? 'Guardando...' : 'Google Wallet',
-                sublabel: 'Para Android',
-                icon: Icons.account_balance_wallet_outlined,
-                isPrimary: false,
-                onTap: _downloading ? null : _downloadVCard,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Icon(Icons.info_outline, size: 13, color: context.textMuted),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                'Abre el archivo descargado en tu teléfono para guardar el contacto',
-                style: GoogleFonts.dmSans(
-                  fontSize: 12,
-                  color: context.textSecondary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
 class _SectionPanel extends StatelessWidget {
   final Widget child;
 
@@ -1201,80 +1083,6 @@ class _SectionHeading extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _WalletButton extends StatelessWidget {
-  final String label;
-  final String sublabel;
-  final IconData icon;
-  final bool isPrimary;
-  final VoidCallback? onTap;
-
-  const _WalletButton({
-    required this.label,
-    required this.sublabel,
-    required this.icon,
-    required this.isPrimary,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: isPrimary ? context.textPrimary : context.bgCard,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: isPrimary ? context.textPrimary : context.borderColor,
-            ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                icon,
-                color: isPrimary
-                    ? (context.isDark ? Colors.black : Colors.white)
-                    : context.textPrimary,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: GoogleFonts.outfit(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isPrimary
-                          ? (context.isDark ? Colors.black : Colors.white)
-                          : context.textPrimary,
-                    ),
-                  ),
-                  Text(
-                    sublabel,
-                    style: GoogleFonts.dmSans(
-                      fontSize: 12,
-                      color: isPrimary
-                          ? (context.isDark
-                                ? Colors.black.withValues(alpha: 0.75)
-                                : Colors.white70)
-                          : context.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
