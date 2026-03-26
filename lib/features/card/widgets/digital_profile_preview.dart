@@ -85,44 +85,18 @@ class _ScreenContent extends StatelessWidget {
   const _ScreenContent({required this.card, required this.scale});
 
   Color get _bgColor {
-    switch (card.themeStyle) {
-      case CardThemeStyle.dark:
-      case CardThemeStyle.neon:
-      case CardThemeStyle.premium:
-        return const Color(0xFF0D0D0D);
-      case CardThemeStyle.gradient:
-        return card.backgroundColorStart ?? const Color(0xFF6C4FE8);
-      case CardThemeStyle.frosted:
-        return const Color(0xFFF4F4F6);
-      case CardThemeStyle.retro:
-        return const Color(0xFFFFF8F0);
-      default:
-        return Colors.white;
-    }
+    // Use bgColor from new design, with fallback to white if not set
+    return card.bgColor ?? Colors.white;
   }
 
-  Color get _textColor =>
-      card.themeStyle == CardThemeStyle.dark ||
-          card.themeStyle == CardThemeStyle.neon ||
-          card.themeStyle == CardThemeStyle.premium ||
-          card.themeStyle == CardThemeStyle.gradient
-      ? Colors.white
-      : const Color(0xFF0D0D0D);
+  Color get _textColor {
+    // Use textColorIsDark from new design: false=white, true=dark
+    return card.textColorIsDark ? const Color(0xFF0D0D0D) : Colors.white;
+  }
 
   Color get _subColor => _textColor.withValues(alpha: 0.55);
 
-  Color get _accentColor {
-    switch (card.themeStyle) {
-      case CardThemeStyle.neon:
-        return const Color(0xFF00FFB2);
-      case CardThemeStyle.retro:
-        return const Color(0xFFE8803A);
-      case CardThemeStyle.premium:
-        return const Color(0xFFD4AF37);
-      default:
-        return card.primaryColor;
-    }
-  }
+  Color get _accentColor => card.primaryColor;
 
   @override
   Widget build(BuildContext context) {
@@ -132,17 +106,14 @@ class _ScreenContent extends StatelessWidget {
     final visibleSocials = card.socialLinks.where((s) => s.isVisible).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     final isCentered = card.layoutStyle == CardLayoutStyle.centered;
-    final isCompact = card.layoutStyle == CardLayoutStyle.compact;
-    final headerPadding = isCompact
-        ? EdgeInsets.fromLTRB(12 * scale, 14 * scale, 12 * scale, 16 * scale)
-        : EdgeInsets.fromLTRB(16 * scale, 20 * scale, 16 * scale, 24 * scale);
+    final headerPadding = EdgeInsets.fromLTRB(16 * scale, 20 * scale, 16 * scale, 24 * scale);
 
     final bgBase = card.bgColor ?? _bgColor;
     final scrollContent = SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       child: Column(
         children: [
-          _buildHeaderBand(headerPadding, isCentered, isCompact),
+          _buildHeaderBand(headerPadding, isCentered),
           // Contact items
           if (visibleContacts.isNotEmpty) ...[
             Padding(
@@ -468,26 +439,21 @@ class _ScreenContent extends StatelessWidget {
   Widget _buildHeaderBand(
     EdgeInsets headerPadding,
     bool isCentered,
-    bool isCompact,
   ) {
     switch (card.layoutStyle) {
       case CardLayoutStyle.banner:
-        return _buildBannerHeader(isCompact);
+        return _buildBannerHeader();
       case CardLayoutStyle.minimal:
-        return _buildMinimalHeader(isCompact);
+        return _buildMinimalHeader();
       default:
-        return _buildClassicHeader(headerPadding, isCentered, isCompact);
+        return _buildClassicHeader(headerPadding, isCentered);
     }
   }
 
   Widget _buildClassicHeader(
     EdgeInsets headerPadding,
     bool isCentered,
-    bool isCompact,
   ) {
-    final isGP =
-        card.themeStyle == CardThemeStyle.gradient ||
-        card.themeStyle == CardThemeStyle.premium;
     return Container(
       width: double.infinity,
       padding: headerPadding,
@@ -496,23 +462,39 @@ class _ScreenContent extends StatelessWidget {
             ? CrossAxisAlignment.center
             : CrossAxisAlignment.start,
         children: [
+          if (card.companyLogoUrl != null && card.companyLogoUrl!.isNotEmpty)
+            Container(
+              height: 30 * scale,
+              constraints: BoxConstraints(maxWidth: 90 * scale),
+              padding: EdgeInsets.symmetric(
+                horizontal: 6 * scale,
+                vertical: 3 * scale,
+              ),
+              child: Image.network(
+                card.companyLogoUrl!,
+                fit: BoxFit.contain,
+                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+          if (card.companyLogoUrl != null && card.companyLogoUrl!.isNotEmpty)
+            SizedBox(height: 8 * scale),
           Container(
-            width: (isCompact ? 44 : 52) * scale,
-            height: (isCompact ? 44 : 52) * scale,
+            width: 52 * scale,
+            height: 52 * scale,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: _accentColor.withValues(alpha: 0.2),
               border: Border.all(color: _accentColor, width: 2),
             ),
-            child: _buildAvatar((isCompact ? 16 : 18) * scale),
+            child: _buildAvatar(18 * scale),
           ),
           SizedBox(height: 10 * scale),
           Text(
             card.name.isEmpty ? 'Tu nombre' : card.name,
             style: GoogleFonts.outfit(
-              fontSize: (isCompact ? 14 : 16) * scale,
+              fontSize: 16 * scale,
               fontWeight: FontWeight.w800,
-              color: isGP ? Colors.white : _textColor,
+              color: _textColor,
             ),
             textAlign: isCentered ? TextAlign.center : TextAlign.left,
           ),
@@ -520,11 +502,23 @@ class _ScreenContent extends StatelessWidget {
           Text(
             card.jobTitle.isEmpty ? 'Tu cargo' : card.jobTitle,
             style: GoogleFonts.dmSans(
-              fontSize: (isCompact ? 10 : 11) * scale,
-              color: isGP ? Colors.white70 : _subColor,
+              fontSize: 11 * scale,
+              color: _subColor,
             ),
             textAlign: isCentered ? TextAlign.center : TextAlign.left,
           ),
+          if (card.company.isNotEmpty) ...[
+            SizedBox(height: 2 * scale),
+            Text(
+              card.company,
+              style: GoogleFonts.dmSans(
+                fontSize: 10 * scale,
+                fontWeight: FontWeight.w600,
+                color: _subColor,
+              ),
+              textAlign: isCentered ? TextAlign.center : TextAlign.left,
+            ),
+          ],
           if (card.bio?.isNotEmpty == true) ...[
             SizedBox(height: 8 * scale),
             Container(
@@ -546,9 +540,7 @@ class _ScreenContent extends StatelessWidget {
                     style: GoogleFonts.outfit(
                       fontSize: 8 * scale,
                       fontWeight: FontWeight.w700,
-                      color: isGP
-                          ? Colors.white.withValues(alpha: 0.82)
-                          : _textColor.withValues(alpha: 0.7),
+                      color: _textColor.withValues(alpha: 0.7),
                     ),
                     textAlign: isCentered ? TextAlign.center : TextAlign.left,
                   ),
@@ -557,7 +549,7 @@ class _ScreenContent extends StatelessWidget {
                     card.bio!,
                     style: GoogleFonts.dmSans(
                       fontSize: 9 * scale,
-                      color: isGP ? Colors.white70 : _subColor,
+                      color: _subColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -567,13 +559,28 @@ class _ScreenContent extends StatelessWidget {
               ),
             ),
           ],
-          SizedBox(height: 8 * scale),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBannerHeader() {
+    final avatarSize = 50.0;
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(
+        horizontal: 12 * scale,
+        vertical: 12 * scale,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           if (card.companyLogoUrl != null && card.companyLogoUrl!.isNotEmpty)
             Container(
-              height: 30 * scale,
-              constraints: BoxConstraints(maxWidth: 90 * scale),
+              height: 26 * scale,
+              constraints: BoxConstraints(maxWidth: 80 * scale),
               padding: EdgeInsets.symmetric(
-                horizontal: 6 * scale,
+                horizontal: 5 * scale,
                 vertical: 3 * scale,
               ),
               child: Image.network(
@@ -582,99 +589,106 @@ class _ScreenContent extends StatelessWidget {
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBannerHeader(bool isCompact) {
-    final isGP =
-        card.themeStyle == CardThemeStyle.gradient ||
-        card.themeStyle == CardThemeStyle.premium;
-    final avatarSize = (isCompact ? 42.0 : 50.0);
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: 12 * scale,
-        vertical: 12 * scale,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Container(
-            width: avatarSize * scale,
-            height: avatarSize * scale,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _accentColor.withValues(alpha: 0.2),
-              border: Border.all(color: _accentColor, width: 2),
-            ),
-            child: _buildAvatar((isCompact ? 15 : 17) * scale),
-          ),
-          SizedBox(width: 10 * scale),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  card.name.isEmpty ? 'Tu nombre' : card.name,
-                  style: GoogleFonts.outfit(
-                    fontSize: (isCompact ? 13 : 14) * scale,
-                    fontWeight: FontWeight.w800,
-                    color: isGP ? Colors.white : _textColor,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+          if (card.companyLogoUrl != null && card.companyLogoUrl!.isNotEmpty)
+            SizedBox(height: 8 * scale),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: avatarSize * scale,
+                height: avatarSize * scale,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _accentColor.withValues(alpha: 0.2),
+                  border: Border.all(color: _accentColor, width: 2),
                 ),
-                SizedBox(height: 2 * scale),
-                Text(
-                  card.jobTitle.isEmpty ? 'Tu cargo' : card.jobTitle,
-                  style: GoogleFonts.dmSans(
-                    fontSize: (isCompact ? 9 : 10) * scale,
-                    color: isGP ? Colors.white70 : _subColor,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                if (card.company.isNotEmpty)
-                  Text(
-                    card.company,
-                    style: GoogleFonts.dmSans(
-                      fontSize: (isCompact ? 8 : 9) * scale,
-                      fontWeight: FontWeight.w600,
-                      color: isGP ? Colors.white70 : _subColor,
+                child: _buildAvatar(17 * scale),
+              ),
+              SizedBox(width: 10 * scale),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      card.name.isEmpty ? 'Tu nombre' : card.name,
+                      style: GoogleFonts.outfit(
+                        fontSize: 14 * scale,
+                        fontWeight: FontWeight.w800,
+                        color: _textColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
+                    SizedBox(height: 2 * scale),
+                    Text(
+                      card.jobTitle.isEmpty ? 'Tu cargo' : card.jobTitle,
+                      style: GoogleFonts.dmSans(
+                        fontSize: 10 * scale,
+                        color: _subColor,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (card.company.isNotEmpty)
+                      Text(
+                        card.company,
+                        style: GoogleFonts.dmSans(
+                          fontSize: 9 * scale,
+                          fontWeight: FontWeight.w600,
+                          color: _subColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (card.bio?.isNotEmpty == true) ...[
+            SizedBox(height: 8 * scale),
+            Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: 12 * scale,
+                vertical: 6 * scale,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8 * scale),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Sobre ti',
+                    style: GoogleFonts.outfit(
+                      fontSize: 8 * scale,
+                      fontWeight: FontWeight.w700,
+                      color: _textColor.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  SizedBox(height: 4 * scale),
+                  Text(
+                    card.bio!,
+                    style: GoogleFonts.dmSans(
+                      fontSize: 9 * scale,
+                      color: _subColor,
+                    ),
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                if (card.companyLogoUrl != null &&
-                    card.companyLogoUrl!.isNotEmpty) ...[
-                  SizedBox(height: 6 * scale),
-                  Container(
-                    height: 26 * scale,
-                    constraints: BoxConstraints(maxWidth: 80 * scale),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 5 * scale,
-                      vertical: 3 * scale,
-                    ),
-                    child: Image.network(
-                      card.companyLogoUrl!,
-                      fit: BoxFit.contain,
-                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildMinimalHeader(bool isCompact) {
-    final avatarSize = (isCompact ? 40.0 : 46.0);
+  Widget _buildMinimalHeader() {
+    final avatarSize = 46.0;
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -683,53 +697,9 @@ class _ScreenContent extends StatelessWidget {
         16 * scale,
         14 * scale,
       ),
-      // No background: transparent to let page bg show through
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: avatarSize * scale,
-            height: avatarSize * scale,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.transparent,
-              border: Border.all(
-                color: _textColor.withValues(alpha: 0.25),
-                width: 1.5,
-              ),
-            ),
-            child: _buildAvatar((isCompact ? 14 : 16) * scale),
-          ),
-          SizedBox(height: 8 * scale),
-          Text(
-            card.name.isEmpty ? 'Tu nombre' : card.name,
-            style: GoogleFonts.outfit(
-              fontSize: (isCompact ? 13 : 15) * scale,
-              fontWeight: FontWeight.w800,
-              color: _textColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          SizedBox(height: 2 * scale),
-          Text(
-            card.jobTitle.isEmpty ? 'Tu cargo' : card.jobTitle,
-            style: GoogleFonts.dmSans(
-              fontSize: (isCompact ? 9 : 10) * scale,
-              color: _subColor,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          if (card.company.isNotEmpty)
-            Text(
-              card.company,
-              style: GoogleFonts.dmSans(
-                fontSize: (isCompact ? 8 : 9) * scale,
-                fontWeight: FontWeight.w600,
-                color: _accentColor,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          SizedBox(height: 8 * scale),
           if (card.companyLogoUrl != null && card.companyLogoUrl!.isNotEmpty)
             Container(
               height: 28 * scale,
@@ -744,6 +714,52 @@ class _ScreenContent extends StatelessWidget {
                 errorBuilder: (_, __, ___) => const SizedBox.shrink(),
               ),
             ),
+          if (card.companyLogoUrl != null && card.companyLogoUrl!.isNotEmpty)
+            SizedBox(height: 8 * scale),
+          Container(
+            width: avatarSize * scale,
+            height: avatarSize * scale,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.transparent,
+              border: Border.all(
+                color: _textColor.withValues(alpha: 0.25),
+                width: 1.5,
+              ),
+            ),
+            child: _buildAvatar(16 * scale),
+          ),
+          SizedBox(height: 8 * scale),
+          Text(
+            card.name.isEmpty ? 'Tu nombre' : card.name,
+            style: GoogleFonts.outfit(
+              fontSize: 15 * scale,
+              fontWeight: FontWeight.w800,
+              color: _textColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 2 * scale),
+          Text(
+            card.jobTitle.isEmpty ? 'Tu cargo' : card.jobTitle,
+            style: GoogleFonts.dmSans(
+              fontSize: 10 * scale,
+              color: _subColor,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (card.company.isNotEmpty) ...[
+            SizedBox(height: 2 * scale),
+            Text(
+              card.company,
+              style: GoogleFonts.dmSans(
+                fontSize: 9 * scale,
+                fontWeight: FontWeight.w600,
+                color: _accentColor,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );

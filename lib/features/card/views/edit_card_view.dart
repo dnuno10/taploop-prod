@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/services/supabase_service.dart';
 import '../../../core/theme/app_theme_extensions.dart';
 import '../../../core/utils/responsive.dart';
+import '../../../core/utils/field_validators.dart';
 import '../../../core/data/app_state.dart';
 import '../../../core/data/repositories/card_repository.dart';
 import '../../../core/widgets/card_initial_setup_state.dart';
@@ -1298,7 +1299,7 @@ class _LivePreviewPanel extends StatelessWidget {
 
 // ─── Profile Tab ─────────────────────────────────────────────────────────────
 
-class _ProfileTab extends StatelessWidget {
+class _ProfileTab extends StatefulWidget {
   final TextEditingController nameCtrl;
   final TextEditingController titleCtrl;
   final TextEditingController companyCtrl;
@@ -1318,6 +1319,87 @@ class _ProfileTab extends StatelessWidget {
   });
 
   @override
+  State<_ProfileTab> createState() => _ProfileTabState();
+}
+
+class _ProfileTabState extends State<_ProfileTab> {
+  String _nameError = '';
+  String _titleError = '';
+  String _bioError = '';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.nameCtrl.addListener(() => setState(() {}));
+    widget.titleCtrl.addListener(() => setState(() {}));
+    widget.bioCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
+  void _validateFields() {
+    setState(() {
+      // Validate name (max 50 chars)
+      final nameValidation = FieldValidators.validateMaxLength(
+        widget.nameCtrl.text,
+        FieldValidators.nameMaxLength,
+        'Nombre',
+      );
+      _nameError = nameValidation.errorMessage ?? '';
+
+      // Validate title (max 50 chars)
+      final titleValidation = FieldValidators.validateMaxLength(
+        widget.titleCtrl.text,
+        FieldValidators.jobTitleMaxLength,
+        'Cargo',
+      );
+      _titleError = titleValidation.errorMessage ?? '';
+
+      // Validate bio (max 100 chars)
+      final bioValidation = FieldValidators.validateMaxLength(
+        widget.bioCtrl.text,
+        FieldValidators.bioMaxLength,
+        'Biografía',
+      );
+      _bioError = bioValidation.errorMessage ?? '';
+    });
+  }
+
+  void _validateFieldsOnBlur(String fieldName) {
+    setState(() {
+      switch (fieldName) {
+        case 'name':
+          final validation = FieldValidators.validateMaxLength(
+            widget.nameCtrl.text,
+            FieldValidators.nameMaxLength,
+            'Nombre',
+          );
+          _nameError = validation.errorMessage ?? '';
+          break;
+        case 'title':
+          final validation = FieldValidators.validateMaxLength(
+            widget.titleCtrl.text,
+            FieldValidators.jobTitleMaxLength,
+            'Cargo',
+          );
+          _titleError = validation.errorMessage ?? '';
+          break;
+        case 'bio':
+          final validation = FieldValidators.validateMaxLength(
+            widget.bioCtrl.text,
+            FieldValidators.bioMaxLength,
+            'Biografía',
+          );
+          _bioError = validation.errorMessage ?? '';
+          break;
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -1327,7 +1409,7 @@ class _ProfileTab extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AvatarPicker(card: card, onPhotoChanged: onPhotoChanged),
+              _AvatarPicker(card: widget.card, onPhotoChanged: widget.onPhotoChanged),
               const SizedBox(height: 32),
               Divider(color: context.borderColor, height: 1),
               const SizedBox(height: 28),
@@ -1342,23 +1424,29 @@ class _ProfileTab extends StatelessWidget {
               const SizedBox(height: 20),
               _EditInputField(
                 label: 'Nombre completo',
-                controller: nameCtrl,
+                controller: widget.nameCtrl,
                 hint: 'Ej: Juan García',
+                error: _nameError,
+                maxLength: FieldValidators.nameMaxLength,
+                onChanged: (_) => _validateFieldsOnBlur('name'),
               ),
               const SizedBox(height: 18),
               _EditInputField(
                 label: 'Cargo / Rol',
-                controller: titleCtrl,
+                controller: widget.titleCtrl,
                 hint: 'Ej: Software Engineer',
+                error: _titleError,
+                maxLength: FieldValidators.jobTitleMaxLength,
+                onChanged: (_) => _validateFieldsOnBlur('title'),
               ),
               const SizedBox(height: 18),
               _EditInputField(
                 label: 'Empresa',
-                controller: companyCtrl,
+                controller: widget.companyCtrl,
                 hint: 'Ej: TapLoop Inc.',
-                enabled: !companyLocked,
+                enabled: !widget.companyLocked,
               ),
-              if (companyLocked) ...[
+              if (widget.companyLocked) ...[
                 const SizedBox(height: 8),
                 Text(
                   'Este campo se completa automaticamente segun la organizacion del usuario y no puede modificarse.',
@@ -1390,9 +1478,12 @@ class _ProfileTab extends StatelessWidget {
               const SizedBox(height: 16),
               _EditInputField(
                 label: 'Biografía',
-                controller: bioCtrl,
+                controller: widget.bioCtrl,
                 hint: 'Especialista en...',
                 maxLines: 4,
+                error: _bioError,
+                maxLength: FieldValidators.bioMaxLength,
+                onChanged: (_) => _validateFieldsOnBlur('bio'),
               ),
               const SizedBox(height: 48),
             ],
@@ -2078,28 +2169,7 @@ class _DesignTab extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Estilo de tarjeta',
-                      style: GoogleFonts.outfit(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: context.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: CardThemeStyle.values.map((style) {
-                        return _ThemeChip(
-                          style: style,
-                          selected: card.themeStyle == style,
-                          onTap: () =>
-                              onChanged(card.copyWith(themeStyle: style)),
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 28),
+                    // ── Tipo de Layout ────────────────────────────────
                     Text(
                       'Tipo de Layout',
                       style: GoogleFonts.outfit(
@@ -2130,8 +2200,10 @@ class _DesignTab extends StatelessWidget {
                       }).toList(),
                     ),
                     const SizedBox(height: 32),
+                    
+                    // ── Color de Texto ───────────────────────────────
                     Text(
-                      'Color principal',
+                      'Color de Texto',
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
@@ -2140,49 +2212,35 @@ class _DesignTab extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Se aplica al encabezado y detalles de tu tarjeta.',
+                      'Define el color de todos tus textos.',
                       style: GoogleFonts.dmSans(
                         fontSize: 13,
                         color: context.textSecondary,
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children:
-                          const [
-                            Color(0xFFEF6820),
-                            Color(0xFF6C4FE8),
-                            Color(0xFF1A73E8),
-                            Color(0xFF1A8C4E),
-                            Color(0xFFD93025),
-                            Color(0xFF0D0D0D),
-                            Color(0xFF00ACC1),
-                            Color(0xFFF5A623),
-                          ].map((c) {
-                            return _ColorDot(
-                              color: c,
-                              selected: card.primaryColor == c,
-                              onTap: () =>
-                                  onChanged(card.copyWith(primaryColor: c)),
-                            );
-                          }).toList(),
-                    ),
                     const SizedBox(height: 14),
-                    _CustomColorPanel(
-                      color: card.primaryColor,
-                      onChanged: (c) => onChanged(
-                        card.copyWith(
-                          primaryColor: c,
-                          themeStyle: card.themeStyle == CardThemeStyle.custom
-                              ? card.themeStyle
-                              : CardThemeStyle.custom,
+                    Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      children: [
+                        _TextColorButton(
+                          label: 'Blanco',
+                          isDark: false,
+                          selected: !card.textColorIsDark,
+                          onTap: () =>
+                              onChanged(card.copyWith(textColorIsDark: false)),
                         ),
-                      ),
+                        _TextColorButton(
+                          label: 'Negro',
+                          isDark: true,
+                          selected: card.textColorIsDark,
+                          onTap: () =>
+                              onChanged(card.copyWith(textColorIsDark: true)),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 32),
-
+                    
                     // ── Fondo de tarjeta ──────────────────────────────
                     Text(
                       'Fondo de tarjeta',
@@ -2289,6 +2347,60 @@ class _DesignTab extends StatelessWidget {
                             onChanged(card.copyWith(bgColorEnd: c)),
                       ),
                     ],
+                    const SizedBox(height: 32),
+                    
+                    // ── Color de Botones ─────────────────────────────
+                    Text(
+                      'Color de Botones',
+                      style: GoogleFonts.outfit(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Se aplica a botones y detalles de tu tarjeta.',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 13,
+                        color: context.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children:
+                          const [
+                            Color(0xFFEF6820),
+                            Color(0xFF6C4FE8),
+                            Color(0xFF1A73E8),
+                            Color(0xFF1A8C4E),
+                            Color(0xFFD93025),
+                            Color(0xFF0D0D0D),
+                            Color(0xFF00ACC1),
+                            Color(0xFFF5A623),
+                          ].map((c) {
+                            return _ColorDot(
+                              color: c,
+                              selected: card.primaryColor == c,
+                              onTap: () =>
+                                  onChanged(card.copyWith(primaryColor: c)),
+                            );
+                          }).toList(),
+                    ),
+                    const SizedBox(height: 14),
+                    _CustomColorPanel(
+                      color: card.primaryColor,
+                      onChanged: (c) => onChanged(
+                        card.copyWith(
+                          primaryColor: c,
+                          themeStyle: card.themeStyle == CardThemeStyle.custom
+                              ? card.themeStyle
+                              : CardThemeStyle.custom,
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 48),
                   ],
                 ),
@@ -2346,28 +2458,20 @@ class _BgStyleChip extends StatelessWidget {
   }
 }
 
-class _ThemeChip extends StatelessWidget {
-  final CardThemeStyle style;
+class _TextColorButton extends StatelessWidget {
+  final String label;
+  final bool isDark;
   final bool selected;
   final VoidCallback onTap;
-  const _ThemeChip({
-    required this.style,
+  const _TextColorButton({
+    required this.label,
+    required this.isDark,
     required this.selected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final label = switch (style) {
-      CardThemeStyle.white => 'Blanco',
-      CardThemeStyle.dark => 'Oscuro',
-      CardThemeStyle.gradient => 'Degradado',
-      CardThemeStyle.frosted => 'Esmerilado',
-      CardThemeStyle.neon => 'Neón',
-      CardThemeStyle.premium => 'Premium',
-      CardThemeStyle.retro => 'Retro',
-      CardThemeStyle.custom => 'Custom',
-    };
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -2410,21 +2514,18 @@ class _LayoutChip extends StatelessWidget {
     final icon = switch (layout) {
       CardLayoutStyle.centered => Icons.person_outline,
       CardLayoutStyle.leftAligned => Icons.format_align_left,
-      CardLayoutStyle.compact => Icons.view_compact,
       CardLayoutStyle.banner => Icons.view_headline,
       CardLayoutStyle.minimal => Icons.radio_button_unchecked,
     };
     final label = switch (layout) {
       CardLayoutStyle.centered => 'Clásico',
       CardLayoutStyle.leftAligned => 'Izquierda',
-      CardLayoutStyle.compact => 'Compacto',
       CardLayoutStyle.banner => 'Banner',
       CardLayoutStyle.minimal => 'Minimalista',
     };
     final desc = switch (layout) {
       CardLayoutStyle.centered => 'Avatar arriba centrado',
       CardLayoutStyle.leftAligned => 'Contenido a la izquierda',
-      CardLayoutStyle.compact => 'Vista condensada',
       CardLayoutStyle.banner => 'Avatar y nombre en fila',
       CardLayoutStyle.minimal => 'Sin banda de encabezado',
     };
@@ -2561,6 +2662,7 @@ class _CustomColorPanelState extends State<_CustomColorPanel> {
   }
 
   void _onHexChanged() {
+    if (_hexCtrl.text.isEmpty) return;
     final parsed = _parseHex(_hexCtrl.text);
     if (parsed != null) {
       _settingFromSlider = false;
@@ -2705,7 +2807,7 @@ class _CustomColorPanelState extends State<_CustomColorPanel> {
           _ColorSlider(
             label: 'B',
             value: b.toDouble(),
-            activeColor: AppColors.primary,
+            activeColor: Colors.blue,
             onChanged: (v) {
               _settingFromSlider = true;
               widget.onChanged(Color.fromARGB(a, r, g, v.round()));
@@ -2847,6 +2949,8 @@ class _AddContactSheetState extends State<_AddContactSheet> {
   ContactType _type = ContactType.phone;
   final _valueCtrl = TextEditingController();
   final _labelCtrl = TextEditingController();
+  String _valueError = '';
+  String _labelError = '';
 
   bool get _isEditing => widget.initialItem != null;
 
@@ -2859,6 +2963,8 @@ class _AddContactSheetState extends State<_AddContactSheet> {
       _valueCtrl.text = initial.value;
       _labelCtrl.text = initial.label ?? '';
     }
+    _valueCtrl.addListener(() => setState(() {}));
+    _labelCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -2866,6 +2972,57 @@ class _AddContactSheetState extends State<_AddContactSheet> {
     _valueCtrl.dispose();
     _labelCtrl.dispose();
     super.dispose();
+  }
+
+  bool _validateFields() {
+    setState(() {
+      _valueError = '';
+      _labelError = '';
+    });
+
+    final value = _valueCtrl.text.trim();
+    final label = _labelCtrl.text.trim();
+    bool hasError = false;
+
+    // Validar el campo principal según el tipo
+    ValidationResult valueValidation;
+    switch (_type) {
+      case ContactType.phone:
+      case ContactType.whatsapp:
+        valueValidation = FieldValidators.validateContactPhone(value);
+        break;
+      case ContactType.email:
+        valueValidation = FieldValidators.validateContactEmail(value);
+        break;
+      case ContactType.website:
+        valueValidation = FieldValidators.validateUrl(value);
+        if (valueValidation.isValid && value.isNotEmpty) {
+          final lengthValidation = FieldValidators.validateMaxLength(
+            value,
+            FieldValidators.contactPrimaryMaxLength,
+            'El sitio web',
+          );
+          valueValidation = lengthValidation;
+        }
+        break;
+      case ContactType.address:
+        valueValidation = FieldValidators.validateContactText(value);
+        break;
+    }
+
+    if (!valueValidation.isValid) {
+      setState(() => _valueError = valueValidation.errorMessage ?? '');
+      hasError = true;
+    }
+
+    // Validar etiqueta
+    final labelValidation = FieldValidators.validateSocialLabel(label);
+    if (!labelValidation.isValid) {
+      setState(() => _labelError = labelValidation.errorMessage ?? '');
+      hasError = true;
+    }
+
+    return !hasError;
   }
 
   static const _hints = {
@@ -2995,12 +3152,16 @@ class _AddContactSheetState extends State<_AddContactSheet> {
             label: _labels[_type]!,
             controller: _valueCtrl,
             hint: _hints[_type],
+            error: _valueError,
+            maxLength: FieldValidators.contactPrimaryMaxLength,
           ),
           const SizedBox(height: 14),
           _EditInputField(
             label: 'Etiqueta (opcional)',
             controller: _labelCtrl,
             hint: 'Ej: Oficina',
+            error: _labelError,
+            maxLength: FieldValidators.contactSecondaryMaxLength,
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -3008,7 +3169,24 @@ class _AddContactSheetState extends State<_AddContactSheet> {
             child: TapLoopButton(
               label: _isEditing ? 'Guardar cambios' : 'Añadir',
               onPressed: () {
-                if (_valueCtrl.text.trim().isEmpty) return;
+                if (!_validateFields()) {
+                  TapLoopToast.show(
+                    context,
+                    'Por favor, verifica los campos marcados.',
+                    TapLoopToastType.error,
+                  );
+                  return;
+                }
+
+                if (_valueCtrl.text.trim().isEmpty) {
+                  TapLoopToast.show(
+                    context,
+                    '${_labels[_type]} es requerido.',
+                    TapLoopToastType.error,
+                  );
+                  return;
+                }
+
                 final initial = widget.initialItem;
                 widget.onSubmit(
                   ContactItemModel(
@@ -3055,6 +3233,8 @@ class _AddSocialSheetState extends State<_AddSocialSheet> {
   SocialPlatform _platform = SocialPlatform.linkedin;
   final _urlCtrl = TextEditingController();
   final _labelCtrl = TextEditingController();
+  String _urlError = '';
+  String _labelError = '';
 
   bool get _isEditing => widget.initialLink != null;
 
@@ -3067,6 +3247,8 @@ class _AddSocialSheetState extends State<_AddSocialSheet> {
       _urlCtrl.text = initial.url;
       _labelCtrl.text = initial.customLabel ?? '';
     }
+    _urlCtrl.addListener(() => setState(() {}));
+    _labelCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -3074,6 +3256,33 @@ class _AddSocialSheetState extends State<_AddSocialSheet> {
     _urlCtrl.dispose();
     _labelCtrl.dispose();
     super.dispose();
+  }
+
+  bool _validateFields() {
+    setState(() {
+      _urlError = '';
+      _labelError = '';
+    });
+
+    final url = _urlCtrl.text.trim();
+    final label = _labelCtrl.text.trim();
+    bool hasError = false;
+
+    // Validar URL
+    final urlValidation = FieldValidators.validateSocialUrl(url);
+    if (!urlValidation.isValid) {
+      setState(() => _urlError = urlValidation.errorMessage ?? '');
+      hasError = true;
+    }
+
+    // Validar etiqueta
+    final labelValidation = FieldValidators.validateSocialLabel(label);
+    if (!labelValidation.isValid) {
+      setState(() => _labelError = labelValidation.errorMessage ?? '');
+      hasError = true;
+    }
+
+    return !hasError;
   }
 
   static const _platformLabels = {
@@ -3217,12 +3426,16 @@ class _AddSocialSheetState extends State<_AddSocialSheet> {
             controller: _urlCtrl,
             hint: _platformHints[_platform],
             keyboardType: TextInputType.url,
+            error: _urlError,
+            maxLength: FieldValidators.socialUrlMaxLength,
           ),
           const SizedBox(height: 14),
           _EditInputField(
             label: 'Etiqueta (opcional)',
             controller: _labelCtrl,
             hint: 'Ej: Mi canal principal',
+            error: _labelError,
+            maxLength: FieldValidators.socialLabelMaxLength,
           ),
           const SizedBox(height: 24),
           SizedBox(
@@ -3230,7 +3443,24 @@ class _AddSocialSheetState extends State<_AddSocialSheet> {
             child: TapLoopButton(
               label: _isEditing ? 'Guardar cambios' : 'Añadir',
               onPressed: () {
-                if (_urlCtrl.text.trim().isEmpty) return;
+                if (!_validateFields()) {
+                  TapLoopToast.show(
+                    context,
+                    'Por favor, verifica los campos marcados.',
+                    TapLoopToastType.error,
+                  );
+                  return;
+                }
+
+                if (_urlCtrl.text.trim().isEmpty) {
+                  TapLoopToast.show(
+                    context,
+                    'La URL es requerida.',
+                    TapLoopToastType.error,
+                  );
+                  return;
+                }
+
                 final initial = widget.initialLink;
                 widget.onSubmit(
                   SocialLinkModel(
@@ -3326,27 +3556,62 @@ class _FormulariosTabState extends State<_FormulariosTab> {
     final nameCtrl = TextEditingController();
     final created = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Text(
-          'Nuevo formulario',
-          style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
-        ),
-        content: TextField(
-          controller: nameCtrl,
-          decoration: _corporateInputDecoration(ctx, 'Nombre del formulario'),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          backgroundColor: ctx.bgCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          constraints: const BoxConstraints(maxWidth: 400),
+          title: Text(
+            'Nuevo formulario',
+            style: GoogleFonts.outfit(fontWeight: FontWeight.w700),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, nameCtrl.text.trim()),
-            child: const Text('Crear'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameCtrl,
+                  maxLength: 100,
+                  maxLines: 1,
+                  onChanged: (value) => setDialog(() {}),
+                  decoration: _corporateInputDecoration(ctx, 'Nombre del formulario').copyWith(
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${nameCtrl.text.length}/100',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: nameCtrl.text.length > 80
+                            ? Colors.red
+                            : ctx.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: nameCtrl.text.trim().isNotEmpty
+                  ? () => Navigator.pop(ctx, nameCtrl.text.trim())
+                  : null,
+              child: const Text('Crear'),
+            ),
+          ],
+        ),
       ),
     );
     if (created == null || created.isEmpty) return;
@@ -3411,7 +3676,7 @@ class _FormulariosTabState extends State<_FormulariosTab> {
                     ),
                   ),
                   TapLoopButton(
-                    label: 'Crear formulario',
+                    label: 'Añadir',
                     width: 170,
                     height: 40,
                     icon: const Icon(Icons.add_rounded, size: 16),
@@ -3468,24 +3733,59 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
     final ctrl = TextEditingController(text: widget.form.name);
     final name = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ctx.bgCard,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: const Text('Editar formulario'),
-        content: TextField(
-          controller: ctrl,
-          decoration: _corporateInputDecoration(ctx, 'Nombre'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          backgroundColor: ctx.bgCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          constraints: const BoxConstraints(maxWidth: 400),
+          title: const Text('Editar formulario'),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: ctrl,
+                  maxLength: 100,
+                  maxLines: 1,
+                  onChanged: (value) => setDialog(() {}),
+                  decoration: _corporateInputDecoration(ctx, 'Nombre').copyWith(
+                    counterText: '',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${ctrl.text.length}/100',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: ctrl.text.length > 80
+                            ? Colors.red
+                            : ctx.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: ctrl.text.trim().isNotEmpty
+                  ? () => Navigator.pop(ctx, ctrl.text.trim())
+                  : null,
+              child: const Text('Guardar'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('Guardar'),
-          ),
-        ],
       ),
     );
     if (name == null || name.isEmpty) return;
@@ -3536,6 +3836,8 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
     final labelCtrl = TextEditingController();
     SmartFormFieldType type = SmartFormFieldType.text;
     bool required = false;
+    String labelError = '';
+    
     final created = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -3550,8 +3852,33 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
             children: [
               TextField(
                 controller: labelCtrl,
-                decoration: _corporateInputDecoration(ctx, 'Label del campo'),
+                maxLength: 200,
+                onChanged: (value) {
+                  setDialog(() {
+                    final validation = FieldValidators.validateMaxLength(
+                      value,
+                      FieldValidators.dynamicFieldMaxLength,
+                      'Label',
+                    );
+                    labelError = validation.errorMessage ?? '';
+                  });
+                },
+                decoration: _corporateInputDecoration(
+                  ctx,
+                  'Label del campo',
+                  error: labelError,
+                ),
               ),
+              if (labelError.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  labelError,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               DropdownButtonFormField<SmartFormFieldType>(
                 initialValue: type,
@@ -3579,7 +3906,9 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: labelError.isEmpty && labelCtrl.text.trim().isNotEmpty
+                  ? () => Navigator.pop(ctx, true)
+                  : null,
               child: const Text('Agregar'),
             ),
           ],
@@ -3588,6 +3917,22 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
     );
 
     if (created != true || labelCtrl.text.trim().isEmpty) return;
+    
+    // Final validation before saving
+    final validation = FieldValidators.validateMaxLength(
+      labelCtrl.text,
+      FieldValidators.dynamicFieldMaxLength,
+      'Label',
+    );
+    if (!validation.isValid) {
+      TapLoopToast.show(
+        context,
+        validation.errorMessage ?? 'Error de validación',
+        TapLoopToastType.error,
+      );
+      return;
+    }
+    
     await CardRepository.addSmartFormField(
       widget.form.id,
       SmartFormFieldModel(
@@ -3605,6 +3950,8 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
     final labelCtrl = TextEditingController(text: field.label);
     SmartFormFieldType type = field.fieldType;
     bool required = field.isRequired;
+    String labelError = '';
+    
     final updated = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -3619,8 +3966,33 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
             children: [
               TextField(
                 controller: labelCtrl,
-                decoration: _corporateInputDecoration(ctx, 'Label del campo'),
+                maxLength: 200,
+                onChanged: (value) {
+                  setDialog(() {
+                    final validation = FieldValidators.validateMaxLength(
+                      value,
+                      FieldValidators.dynamicFieldMaxLength,
+                      'Label',
+                    );
+                    labelError = validation.errorMessage ?? '';
+                  });
+                },
+                decoration: _corporateInputDecoration(
+                  ctx,
+                  'Label del campo',
+                  error: labelError,
+                ),
               ),
+              if (labelError.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Text(
+                  labelError,
+                  style: GoogleFonts.dmSans(
+                    fontSize: 12,
+                    color: Colors.red,
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               DropdownButtonFormField<SmartFormFieldType>(
                 initialValue: type,
@@ -3648,7 +4020,9 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
               child: const Text('Cancelar'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
+              onPressed: labelError.isEmpty && labelCtrl.text.trim().isNotEmpty
+                  ? () => Navigator.pop(ctx, true)
+                  : null,
               child: const Text('Guardar'),
             ),
           ],
@@ -3656,6 +4030,22 @@ class _DbSmartFormCardState extends State<_DbSmartFormCard> {
       ),
     );
     if (updated != true || labelCtrl.text.trim().isEmpty) return;
+    
+    // Final validation before saving
+    final validation = FieldValidators.validateMaxLength(
+      labelCtrl.text,
+      FieldValidators.dynamicFieldMaxLength,
+      'Label',
+    );
+    if (!validation.isValid) {
+      TapLoopToast.show(
+        context,
+        validation.errorMessage ?? 'Error de validación',
+        TapLoopToastType.error,
+      );
+      return;
+    }
+    
     await CardRepository.updateSmartFormField(
       field.copyWith(
         label: labelCtrl.text.trim(),
@@ -3942,6 +4332,7 @@ class _CalendarioTabState extends State<_CalendarioTab> {
                         hint: provider.hint,
                         keyboardType: TextInputType.url,
                         enabled: _enabled,
+                        maxLength: FieldValidators.calendarUrlMaxLength,
                         onChanged: (_) {
                           setState(() {});
                           _emitChanges();
@@ -4026,6 +4417,8 @@ class _EditInputField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool enabled;
   final ValueChanged<String>? onChanged;
+  final String? error;
+  final int? maxLength;
 
   const _EditInputField({
     required this.label,
@@ -4035,20 +4428,39 @@ class _EditInputField extends StatelessWidget {
     this.keyboardType,
     this.enabled = true,
     this.onChanged,
+    this.error,
+    this.maxLength,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hasError = error != null && error!.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.dmSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-            color: context.textSecondary,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: GoogleFonts.dmSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: context.textSecondary,
+              ),
+            ),
+            if (maxLength != null)
+              Text(
+                '${controller.text.length}/$maxLength',
+                style: GoogleFonts.dmSans(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: controller.text.length > maxLength!
+                      ? Colors.red
+                      : context.textMuted,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
         TextField(
@@ -4056,6 +4468,7 @@ class _EditInputField extends StatelessWidget {
           keyboardType: keyboardType,
           enabled: enabled,
           maxLines: maxLines,
+          maxLength: maxLength,
           onChanged: onChanged,
           style: GoogleFonts.dmSans(
             fontSize: 14,
@@ -4076,7 +4489,10 @@ class _EditInputField extends StatelessWidget {
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: context.borderColor),
+              borderSide: BorderSide(
+                color: hasError ? Colors.red : context.borderColor,
+                width: hasError ? 1.5 : 1,
+              ),
             ),
             disabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -4085,18 +4501,37 @@ class _EditInputField extends StatelessWidget {
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: AppColors.primary.withValues(alpha: 0.85),
+                color: hasError
+                    ? Colors.red
+                    : AppColors.primary.withValues(alpha: 0.85),
                 width: 1.4,
               ),
             ),
+            counterText: '',
           ),
         ),
+        if (hasError) ...[
+          const SizedBox(height: 6),
+          Text(
+            error!,
+            style: GoogleFonts.dmSans(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: Colors.red,
+            ),
+          ),
+        ],
       ],
     );
   }
 }
 
-InputDecoration _corporateInputDecoration(BuildContext context, String hint) {
+InputDecoration _corporateInputDecoration(
+  BuildContext context,
+  String hint, {
+  String? error,
+}) {
+  final hasError = error != null && error.isNotEmpty;
   return InputDecoration(
     hintText: hint,
     hintStyle: GoogleFonts.dmSans(fontSize: 13, color: context.textMuted),
@@ -4106,11 +4541,17 @@ InputDecoration _corporateInputDecoration(BuildContext context, String hint) {
     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
     enabledBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: BorderSide(color: context.borderColor),
+      borderSide: BorderSide(
+        color: hasError ? Colors.red : context.borderColor,
+        width: hasError ? 1.2 : 1,
+      ),
     ),
     focusedBorder: OutlineInputBorder(
       borderRadius: BorderRadius.circular(12),
-      borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+      borderSide: BorderSide(
+        color: hasError ? Colors.red : AppColors.primary,
+        width: 1.4,
+      ),
     ),
   );
 }

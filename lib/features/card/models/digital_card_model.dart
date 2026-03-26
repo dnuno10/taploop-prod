@@ -35,14 +35,12 @@ CardThemeStyle _themeStyleFromString(String s) {
   }
 }
 
-enum CardLayoutStyle { centered, leftAligned, compact, banner, minimal }
+enum CardLayoutStyle { centered, leftAligned, banner, minimal }
 
 CardLayoutStyle _layoutStyleFromString(String s) {
   switch (s) {
     case 'leftAligned':
       return CardLayoutStyle.leftAligned;
-    case 'compact':
-      return CardLayoutStyle.compact;
     case 'banner':
       return CardLayoutStyle.banner;
     case 'minimal':
@@ -84,6 +82,7 @@ class DigitalCardModel {
   final Color? backgroundColorStart;
   final Color? backgroundColorEnd;
   final CardLayoutStyle layoutStyle;
+  final bool textColorIsDark;
   // Background
   final CardBgStyle bgStyle;
   final Color? bgColor;
@@ -121,6 +120,7 @@ class DigitalCardModel {
     this.backgroundColorStart,
     this.backgroundColorEnd,
     this.layoutStyle = CardLayoutStyle.centered,
+    this.textColorIsDark = false,
     this.bgStyle = CardBgStyle.plain,
     this.bgColor,
     this.bgColorEnd,
@@ -241,6 +241,7 @@ class DigitalCardModel {
     Color? backgroundColorStart,
     Color? backgroundColorEnd,
     CardLayoutStyle? layoutStyle,
+    bool? textColorIsDark,
     CardBgStyle? bgStyle,
     Color? bgColor,
     Color? bgColorEnd,
@@ -272,6 +273,7 @@ class DigitalCardModel {
       backgroundColorStart: backgroundColorStart ?? this.backgroundColorStart,
       backgroundColorEnd: backgroundColorEnd ?? this.backgroundColorEnd,
       layoutStyle: layoutStyle ?? this.layoutStyle,
+      textColorIsDark: textColorIsDark ?? this.textColorIsDark,
       bgStyle: bgStyle ?? this.bgStyle,
       bgColor: bgColor ?? this.bgColor,
       bgColorEnd: bgColorEnd ?? this.bgColorEnd,

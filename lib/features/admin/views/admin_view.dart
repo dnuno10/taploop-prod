@@ -1886,7 +1886,8 @@ class _EditMemberDialogState extends State<_EditMemberDialog>
     final layoutOptions = [
       (CardLayoutStyle.centered, 'Centrado'),
       (CardLayoutStyle.leftAligned, 'Izquierda'),
-      (CardLayoutStyle.compact, 'Compacto'),
+      (CardLayoutStyle.banner, 'Banner'),
+      (CardLayoutStyle.minimal, 'Minimalista'),
     ];
     return _adminStepPageShell(
       title: 'Diseño',
