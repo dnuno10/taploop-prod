@@ -14,7 +14,6 @@ import '../../campaigns/views/campaigns_view.dart';
 import '../../card/views/edit_card_view.dart';
 import '../../card/views/share_card_view.dart';
 import 'dashboard_view.dart';
-import 'settings_view.dart';
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -56,7 +55,6 @@ class _HomeShellState extends State<HomeShell> {
     const CampaignsView(),
     const AdminView(),
     const ShareCardView(),
-    const SettingsView(),
   ];
 
   static const _navItems = [
@@ -94,11 +92,6 @@ class _HomeShellState extends State<HomeShell> {
       icon: Icons.share_outlined,
       activeIcon: Icons.share_rounded,
       label: 'Compartir',
-    ),
-    _NavItem(
-      icon: Icons.settings_outlined,
-      activeIcon: Icons.settings_rounded,
-      label: 'Ajustes',
     ),
   ];
 

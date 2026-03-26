@@ -15,6 +15,7 @@ class TeamMemberModel {
   final List<String> cardIds;
   final String name;
   final String jobTitle;
+  final String role;
   final String? avatarUrl;
   final int taps;
   final int leads;
@@ -32,6 +33,7 @@ class TeamMemberModel {
     this.cardIds = const [],
     required this.name,
     required this.jobTitle,
+    this.role = 'default',
     this.avatarUrl,
     required this.taps,
     this.leads = 0,
@@ -51,6 +53,7 @@ class TeamMemberModel {
       cardIds: const [],
       name: json['name'] as String? ?? '',
       jobTitle: json['job_title'] as String? ?? '',
+      role: json['role'] as String? ?? 'default',
       avatarUrl: json['photo_url'] as String?,
       taps: (json['taps'] as num?)?.toInt() ?? 0,
       leads: (json['leads'] as num?)?.toInt() ?? 0,
@@ -65,6 +68,8 @@ class TeamMemberModel {
       taps == 0 ? 0 : (conversions / taps).clamp(0.0, 1.0);
 
   double get leadRate => profileViews == 0 ? 0 : (leads / profileViews);
+
+  bool get isAdmin => role == 'admin';
 
   /// AI-generated insight for this member.
   String get aiInsight {

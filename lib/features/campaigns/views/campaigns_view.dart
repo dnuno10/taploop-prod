@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/data/app_state.dart';
@@ -8,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme_extensions.dart';
 import '../../../core/utils/responsive.dart';
 import '../../../core/widgets/card_initial_setup_state.dart';
+import '../../../core/widgets/taploop_toast.dart';
 import '../../analytics/models/visit_event_model.dart';
 import '../models/campaign_model.dart';
 
@@ -55,6 +57,9 @@ class CampaignsView extends StatefulWidget {
 }
 
 class _CampaignsViewState extends State<CampaignsView> {
+  static final RegExp _uuidPattern = RegExp(
+    r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+  );
   List<CampaignModel> _campaigns = [];
   bool _loading = true;
   String? _loadedOrgId;
@@ -122,15 +127,96 @@ class _CampaignsViewState extends State<CampaignsView> {
     }
   }
 
+  Future<String> _friendlyCampaignErrorMessage(
+    Object error, {
+    String? orgId,
+  }) async {
+    final raw = error.toString();
+    final normalized = raw.replaceAll('\n', ' ').trim();
+
+    final userNameById = <String, String>{};
+    if (orgId != null && orgId.isNotEmpty) {
+      try {
+        final users = await CampaignRepository.fetchOrgUsers(orgId);
+        for (final user in users) {
+          final id = user['id'];
+          final name = user['name'];
+          if (id != null && id.isNotEmpty && name != null && name.isNotEmpty) {
+            userNameById[id] = name;
+          }
+        }
+      } catch (_) {}
+    }
+
+    final campaignNameById = <String, String>{
+      for (final campaign in _campaigns) campaign.id: campaign.name,
+    };
+    if (orgId != null &&
+        orgId.isNotEmpty &&
+        _uuidPattern
+            .allMatches(normalized)
+            .map((m) => m.group(0)!)
+            .any((id) => !campaignNameById.containsKey(id))) {
+      try {
+        final campaigns = await CampaignRepository.fetchCampaignsForUser(
+          orgId: orgId,
+        );
+        for (final campaign in campaigns) {
+          campaignNameById[campaign.id] = campaign.name;
+        }
+      } catch (_) {}
+    }
+
+    final ids = _uuidPattern
+        .allMatches(normalized)
+        .map((m) => m.group(0)!)
+        .toList();
+    final matchedUserId = ids.cast<String?>().firstWhere(
+      (id) => id != null && userNameById.containsKey(id),
+      orElse: () => null,
+    );
+    final matchedCampaignId = ids.cast<String?>().firstWhere(
+      (id) => id != null && campaignNameById.containsKey(id),
+      orElse: () => null,
+    );
+
+    if (normalized.toLowerCase().contains('horario traslapado')) {
+      final userName = matchedUserId == null
+          ? 'Este miembro'
+          : userNameById[matchedUserId]!;
+      final campaignName = matchedCampaignId == null
+          ? 'otra campaña'
+          : '"${campaignNameById[matchedCampaignId]!}"';
+      return '$userName ya pertenece a $campaignName en un horario traslapado. Ajusta el horario o cambia el miembro seleccionado.';
+    }
+
+    var cleaned = normalized
+        .replaceFirst(RegExp(r'^[A-Za-z]+Exception\(message:\s*'), '')
+        .replaceFirst(RegExp(r',\s*code:.*$'), '')
+        .trim();
+
+    userNameById.forEach((id, name) {
+      cleaned = cleaned.replaceAll(id, name);
+    });
+    campaignNameById.forEach((id, name) {
+      cleaned = cleaned.replaceAll(id, name);
+    });
+
+    if (cleaned.isEmpty || cleaned == normalized) {
+      return 'No se pudo guardar la campaña. Revisa los datos e inténtalo de nuevo.';
+    }
+    return cleaned;
+  }
+
   void _showNewCampaignSheet() {
     Future<void> onSave(_CampaignEditorResult result) async {
       final orgId = appState.currentUser?.orgId;
       if (orgId == null || orgId.isEmpty) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Tu cuenta no tiene una organización asignada.'),
-            ),
+          TapLoopToast.show(
+            context,
+            'Tu cuenta no tiene una organización asignada.',
+            TapLoopToastType.warning,
           );
         }
         return;
@@ -140,22 +226,27 @@ class _CampaignsViewState extends State<CampaignsView> {
           result.campaign,
           orgId,
         );
-        await CampaignRepository.replaceCampaignMembers(
-          created.id,
-          result.members.map((member) => member.userId).toList(),
+        final memberIds = result.members
+            .map((member) => member.userId)
+            .toList();
+        try {
+          await CampaignRepository.addCampaignMembers(created.id, memberIds);
+        } catch (memberError) {
+          await CampaignRepository.deleteCampaign(created.id);
+          rethrow;
+        }
+        await _load();
+        if (!mounted) return;
+        TapLoopToast.show(
+          context,
+          'Campaña creada correctamente.',
+          TapLoopToastType.success,
         );
-        final hydrated = created.copyWith(
-          assignedMemberNames: result.members
-              .map((member) => member.name)
-              .toList(),
-          memberRoles: result.campaign.memberRoles,
-        );
-        if (mounted) setState(() => _campaigns.insert(0, hydrated));
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error al crear campaña: $e')));
+          final message = await _friendlyCampaignErrorMessage(e, orgId: orgId);
+          if (!mounted) return;
+          TapLoopToast.show(context, message, TapLoopToastType.error);
         }
       }
     }
@@ -184,15 +275,19 @@ class _CampaignsViewState extends State<CampaignsView> {
         final updated = await CampaignRepository.updateCampaign(
           result.campaign,
         );
-        await CampaignRepository.replaceCampaignMembers(
-          updated.id,
-          result.members.map((member) => member.userId).toList(),
-        );
+        if (campaign.status != CampaignStatus.finished) {
+          await CampaignRepository.replaceCampaignMembers(
+            updated.id,
+            result.members.map((member) => member.userId).toList(),
+          );
+        }
         final hydrated = updated.copyWith(
-          assignedMemberNames: result.members
-              .map((member) => member.name)
-              .toList(),
-          memberRoles: result.campaign.memberRoles,
+          assignedMemberNames: campaign.status == CampaignStatus.finished
+              ? campaign.assignedMemberNames
+              : result.members.map((member) => member.name).toList(),
+          memberRoles: campaign.status == CampaignStatus.finished
+              ? campaign.memberRoles
+              : result.campaign.memberRoles,
         );
         if (mounted) {
           setState(() {
@@ -202,9 +297,12 @@ class _CampaignsViewState extends State<CampaignsView> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('Error al actualizar: $e')));
+          final message = await _friendlyCampaignErrorMessage(
+            e,
+            orgId: campaign.orgId ?? appState.currentUser?.orgId,
+          );
+          if (!mounted) return;
+          TapLoopToast.show(context, message, TapLoopToastType.error);
         }
       }
     }
@@ -283,26 +381,6 @@ class _CampaignsViewState extends State<CampaignsView> {
                       ),
                     ],
                   ),
-                  const SizedBox(width: 12),
-                  if (hasLinkedCard)
-                    FilledButton.icon(
-                      onPressed: _showNewCampaignSheet,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: Text(
-                        'Nueva',
-                        style: GoogleFonts.dmSans(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                        ),
-                      ),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: AppColors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -514,7 +592,7 @@ class _CampaignOverviewPanel extends StatelessWidget {
                       style: GoogleFonts.outfit(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: context.textPrimary,
+                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -529,13 +607,13 @@ class _CampaignOverviewPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              OutlinedButton.icon(
+              FilledButton.icon(
                 onPressed: onCreate,
                 icon: const Icon(Icons.add_circle_outline, size: 18),
                 label: const Text('Crear campaña'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 12,
@@ -613,9 +691,15 @@ class _FlowStepCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: context.bgPage,
+        color: context.isDark
+            ? AppColors.primary.withValues(alpha: 0.12)
+            : AppColors.primary.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(
+          color: context.isDark
+              ? AppColors.primary.withValues(alpha: 0.25)
+              : AppColors.primary.withValues(alpha: 0.14),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -625,7 +709,7 @@ class _FlowStepCard extends StatelessWidget {
             style: GoogleFonts.outfit(
               fontSize: 14,
               fontWeight: FontWeight.w800,
-              color: context.textPrimary,
+              color: AppColors.primary,
             ),
           ),
           const SizedBox(height: 6),
@@ -1090,6 +1174,104 @@ class _CampaignDetailState extends State<_CampaignDetail> {
   List<Map<String, String>> _members = [];
   bool _loadingMembers = true;
 
+  bool get _membersLocked => widget.campaign.status == CampaignStatus.finished;
+
+  void _showMembersLockedFeedback() {
+    TapLoopToast.show(
+      context,
+      'No puedes modificar miembros porque se seleccionó una fecha pasada para la campaña. Cambia la fecha y actualiza la campaña para continuar.',
+      TapLoopToastType.warning,
+    );
+  }
+
+  Future<String> _friendlyMemberAssignmentErrorMessage(
+    Object error, {
+    List<Map<String, String>> attemptedUsers = const [],
+  }) async {
+    final raw = error.toString().replaceAll('\n', ' ').trim();
+    final orgId = widget.campaign.orgId ?? appState.currentUser?.orgId;
+
+    final userNameById = <String, String>{};
+    if (orgId != null && orgId.isNotEmpty) {
+      try {
+        final users = await CampaignRepository.fetchOrgUsers(orgId);
+        for (final user in users) {
+          final id = user['id'];
+          final name = user['name'];
+          if (id != null && id.isNotEmpty && name != null && name.isNotEmpty) {
+            userNameById[id] = name;
+          }
+        }
+      } catch (_) {}
+    }
+
+    final campaignNameById = <String, String>{
+      widget.campaign.id: widget.campaign.name,
+    };
+    if (orgId != null && orgId.isNotEmpty) {
+      try {
+        final campaigns = await CampaignRepository.fetchCampaignsForUser(
+          orgId: orgId,
+        );
+        for (final campaign in campaigns) {
+          campaignNameById[campaign.id] = campaign.name;
+        }
+      } catch (_) {}
+    }
+
+    final ids = _CampaignsViewState._uuidPattern
+        .allMatches(raw)
+        .map((m) => m.group(0)!)
+        .toList();
+    final matchedUserId = ids.cast<String?>().firstWhere(
+      (id) => id != null && userNameById.containsKey(id),
+      orElse: () => null,
+    );
+    final matchedCampaignId = ids.cast<String?>().firstWhere(
+      (id) => id != null && campaignNameById.containsKey(id),
+      orElse: () => null,
+    );
+    final attemptedNames = attemptedUsers
+        .map((user) => user['name']?.trim() ?? '')
+        .where((name) => name.isNotEmpty)
+        .toList();
+
+    if (raw.toLowerCase().contains(
+          'duplicate key value violates unique constraint',
+        ) ||
+        raw.contains('campaign_members_campaign_user_uidx')) {
+      if (attemptedNames.length == 1) {
+        return '${attemptedNames.first} ya forma parte de esta campaña.';
+      }
+      if (attemptedNames.length > 1) {
+        return 'Uno o más miembros seleccionados ya forman parte de esta campaña.';
+      }
+      return 'Ese miembro ya forma parte de esta campaña.';
+    }
+
+    if (raw.toLowerCase().contains('horario traslapado')) {
+      final userName = matchedUserId == null
+          ? 'Este miembro'
+          : userNameById[matchedUserId]!;
+      final campaignName = matchedCampaignId == null
+          ? 'otra campaña'
+          : '"${campaignNameById[matchedCampaignId]!}"';
+      return '$userName ya pertenece a $campaignName en un horario traslapado. Ajusta el horario o cambia el miembro seleccionado.';
+    }
+
+    var cleaned = raw
+        .replaceFirst(RegExp(r'^[A-Za-z]+Exception\(message:\s*'), '')
+        .replaceFirst(RegExp(r',\s*code:.*$'), '')
+        .trim();
+    userNameById.forEach((id, name) => cleaned = cleaned.replaceAll(id, name));
+    campaignNameById.forEach(
+      (id, name) => cleaned = cleaned.replaceAll(id, name),
+    );
+    return cleaned.isEmpty || cleaned == raw
+        ? 'No se pudo agregar el equipo. Revisa el horario y los miembros seleccionados.'
+        : cleaned;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1125,6 +1307,10 @@ class _CampaignDetailState extends State<_CampaignDetail> {
   }
 
   Future<void> _removeMember(String userId) async {
+    if (_membersLocked) {
+      _showMembersLockedFeedback();
+      return;
+    }
     try {
       await CampaignRepository.removeCampaignMember(widget.campaign.id, userId);
       if (!mounted) return;
@@ -1138,6 +1324,10 @@ class _CampaignDetailState extends State<_CampaignDetail> {
   }
 
   Future<void> _showAddMemberPicker() async {
+    if (_membersLocked) {
+      _showMembersLockedFeedback();
+      return;
+    }
     final orgId = appState.currentUser?.orgId;
     if (orgId == null || orgId.isEmpty) return;
     final allUsers = await CampaignRepository.fetchOrgUsers(orgId);
@@ -1166,9 +1356,12 @@ class _CampaignDetailState extends State<_CampaignDetail> {
       setState(() => _members = [..._members, ...selected]);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error al agregar equipo: $e')));
+      final message = await _friendlyMemberAssignmentErrorMessage(
+        e,
+        attemptedUsers: selected,
+      );
+      if (!mounted) return;
+      TapLoopToast.show(context, message, TapLoopToastType.error);
     }
   }
 
@@ -1678,12 +1871,12 @@ class _MemberCard extends StatelessWidget {
   final String? role;
   final String? jobTitle;
   final VoidCallback onInsights;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
 
   const _MemberCard({
     required this.name,
     required this.onInsights,
-    required this.onRemove,
+    this.onRemove,
     this.role,
     this.jobTitle,
   });
@@ -1739,11 +1932,16 @@ class _MemberCard extends StatelessWidget {
             tooltip: 'Ver analítica',
             visualDensity: VisualDensity.compact,
           ),
-          IconButton(
-            onPressed: onRemove,
-            icon: Icon(Icons.close_rounded, size: 18, color: context.textMuted),
-            visualDensity: VisualDensity.compact,
-          ),
+          if (onRemove != null)
+            IconButton(
+              onPressed: onRemove,
+              icon: Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: context.textMuted,
+              ),
+              visualDensity: VisualDensity.compact,
+            ),
         ],
       ),
     );
@@ -1778,11 +1976,13 @@ class _MemberAnalyticsDialog extends StatelessWidget {
       backgroundColor: context.bgCard,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
+        constraints: BoxConstraints(
+          maxWidth: 560,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+        ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -1827,111 +2027,122 @@ class _MemberAnalyticsDialog extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 16),
-              if (data == null)
-                Text(
-                  'No se pudo cargar la analítica de este miembro.',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 13,
-                    color: context.textSecondary,
-                  ),
-                )
-              else ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: _PerformanceKpi(
-                        label: 'Vistas',
-                        value: '${data.profileViews}',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _PerformanceKpi(
-                        label: 'Clicks',
-                        value: '${data.clicks}',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _PerformanceKpi(
-                        label: 'Formularios',
-                        value: '${data.forms}',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _PerformanceKpi(
-                        label: 'Interacciones',
-                        value: '${data.interactions}',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _PerformanceKpi(
-                        label: 'Leads',
-                        value: '${data.leads}',
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _PerformanceKpi(
-                        label: 'Cierres',
-                        value: '${data.conversions}',
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                _DetailSection(
-                  title: 'Fuentes dentro de campaña',
-                  child: data.sources.isEmpty
+              Flexible(
+                child: SingleChildScrollView(
+                  child: data == null
                       ? Text(
-                          'Sin interacciones registradas todavía.',
+                          'No se pudo cargar la analítica de este miembro.',
                           style: GoogleFonts.dmSans(
-                            fontSize: 12,
-                            color: context.textMuted,
-                          ),
-                        )
-                      : Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: data.sources
-                              .map(
-                                (source) => _StatChip(
-                                  icon: Icons.bolt_outlined,
-                                  label: source,
-                                ),
-                              )
-                              .toList(),
-                        ),
-                ),
-                const SizedBox(height: 14),
-                _DetailSection(
-                  title: 'Actividad reciente',
-                  child: data.recentEvents.isEmpty
-                      ? Text(
-                          'Sin actividad reciente atribuida a esta campaña.',
-                          style: GoogleFonts.dmSans(
-                            fontSize: 12,
-                            color: context.textMuted,
+                            fontSize: 13,
+                            color: context.textSecondary,
                           ),
                         )
                       : Column(
-                          children: data.recentEvents
-                              .map(
-                                (event) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: _CampaignMemberEventRow(event: event),
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _PerformanceKpi(
+                                    label: 'Vistas',
+                                    value: '${data.profileViews}',
+                                  ),
                                 ),
-                              )
-                              .toList(),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _PerformanceKpi(
+                                    label: 'Clicks',
+                                    value: '${data.clicks}',
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _PerformanceKpi(
+                                    label: 'Formularios',
+                                    value: '${data.forms}',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _PerformanceKpi(
+                                    label: 'Interacciones',
+                                    value: '${data.interactions}',
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _PerformanceKpi(
+                                    label: 'Leads',
+                                    value: '${data.leads}',
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: _PerformanceKpi(
+                                    label: 'Cierres',
+                                    value: '${data.conversions}',
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
+                            _DetailSection(
+                              title: 'Fuentes dentro de campaña',
+                              child: data.sources.isEmpty
+                                  ? Text(
+                                      'Sin interacciones registradas todavía.',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 12,
+                                        color: context.textMuted,
+                                      ),
+                                    )
+                                  : Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: data.sources
+                                          .map(
+                                            (source) => _StatChip(
+                                              icon: Icons.bolt_outlined,
+                                              label: source,
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                            ),
+                            const SizedBox(height: 14),
+                            _DetailSection(
+                              title: 'Actividad reciente',
+                              child: data.recentEvents.isEmpty
+                                  ? Text(
+                                      'Sin actividad reciente atribuida a esta campaña.',
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 12,
+                                        color: context.textMuted,
+                                      ),
+                                    )
+                                  : Column(
+                                      children: data.recentEvents
+                                          .map(
+                                            (event) => Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 10,
+                                              ),
+                                              child: _CampaignMemberEventRow(
+                                                event: event,
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
+                                    ),
+                            ),
+                          ],
                         ),
                 ),
-              ],
+              ),
             ],
           ),
         ),
@@ -2330,6 +2541,15 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
   List<CampaignMemberAssignment> _selectedMembers = [];
 
   bool get _isEditing => widget.existing != null;
+  bool get _teamLocked => widget.existing?.status == CampaignStatus.finished;
+
+  void _showMembersDateFeedback() {
+    TapLoopToast.show(
+      context,
+      'No puedes modificar miembros porque se seleccionó una fecha pasada para la campaña. Cambia la fecha y actualiza la campaña para continuar.',
+      TapLoopToastType.warning,
+    );
+  }
 
   static const _types = [
     'Evento',
@@ -2406,10 +2626,14 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
   }
 
   Future<void> _pickDate() async {
+    final today = DateTime.now();
+    final minDate = _isEditing && _date.isBefore(today)
+        ? _date
+        : DateTime(today.year, today.month, today.day);
     final picked = await showDatePicker(
       context: context,
       initialDate: _date,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      firstDate: minDate,
       lastDate: DateTime(2035),
     );
     if (picked != null) setState(() => _date = picked);
@@ -2431,6 +2655,10 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
   }
 
   Future<void> _selectMembers() async {
+    if (_teamLocked) {
+      _showMembersDateFeedback();
+      return;
+    }
     final selected = await showDialog<List<Map<String, String>>>(
       context: context,
       builder: (_) => _MemberMultiSelectDialog(
@@ -2460,27 +2688,38 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
 
   void _save() {
     final name = _nameCtrl.text.trim();
+    final today = DateTime.now();
+    final campaignDate = DateTime(_date.year, _date.month, _date.day);
+    final todayDate = DateTime(today.year, today.month, today.day);
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Ingresa el nombre de la campaña.')),
+      TapLoopToast.show(
+        context,
+        'Ingresa el nombre de la campaña.',
+        TapLoopToastType.warning,
+      );
+      return;
+    }
+    if (!_isEditing && campaignDate.isBefore(todayDate)) {
+      TapLoopToast.show(
+        context,
+        'No puedes guardar la campaña porque la fecha seleccionada ya pasó.',
+        TapLoopToastType.warning,
       );
       return;
     }
     if (_startTime == null || _endTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecciona una hora de inicio y una hora de fin.'),
-        ),
+      TapLoopToast.show(
+        context,
+        'Selecciona una hora de inicio y una hora de fin.',
+        TapLoopToastType.warning,
       );
       return;
     }
     if (!_isValidTimeRange(_startTime!, _endTime!)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'La hora de fin debe ser posterior a la hora de inicio.',
-          ),
-        ),
+      TapLoopToast.show(
+        context,
+        'La hora de fin debe ser posterior a la hora de inicio.',
+        TapLoopToastType.warning,
       );
       return;
     }
@@ -2594,6 +2833,12 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                       controller: _nameCtrl,
                       label: 'Nombre de la campaña',
                       hint: 'Ej. Expo Industrial 2026',
+                      maxLength: 300,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          _campaignSingleLinePattern,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -2630,6 +2875,12 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                       hint:
                           'Qué se busca validar, captar o posicionar en esta campaña.',
                       maxLines: 4,
+                      maxLength: 300,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                          _campaignMultilinePattern,
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -2648,6 +2899,12 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                             controller: _locationCtrl,
                             label: 'Ubicación principal',
                             hint: 'Ej. Monterrey, NL',
+                            maxLength: 300,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                _campaignSingleLinePattern,
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -2656,6 +2913,12 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                             controller: _zoneCtrl,
                             label: 'Zona',
                             hint: 'Ej. Stand A12, VIP, Entrada',
+                            maxLength: 300,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                _campaignSingleLinePattern,
+                              ),
+                            ],
                           ),
                         ),
                       ],
@@ -2769,12 +3032,20 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                                 child: _SelectedMemberRow(
                                   member: entry.value,
                                   onRoleChanged: (role) {
+                                    if (_teamLocked) {
+                                      _showMembersDateFeedback();
+                                      return;
+                                    }
                                     setState(() {
                                       _selectedMembers[entry.key] = entry.value
                                           .copyWith(role: role);
                                     });
                                   },
                                   onRemove: () {
+                                    if (_teamLocked) {
+                                      _showMembersDateFeedback();
+                                      return;
+                                    }
                                     setState(() {
                                       _selectedMembers.removeAt(entry.key);
                                     });
@@ -2800,6 +3071,10 @@ class _NewCampaignSheetState extends State<_NewCampaignSheet> {
                             label: 'Meta de leads',
                             hint: 'Ej. 250',
                             keyboardType: TextInputType.number,
+                            maxLength: 300,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
                           ),
                         ),
                       ],
@@ -3086,7 +3361,7 @@ class _SheetDropdownField<T> extends StatelessWidget {
   final T value;
   final List<T> items;
   final String Function(T value) itemLabel;
-  final ValueChanged<T?> onChanged;
+  final ValueChanged<T?>? onChanged;
 
   const _SheetDropdownField({
     required this.label,
@@ -3144,8 +3419,8 @@ class _SheetDropdownField<T> extends StatelessWidget {
 
 class _SelectedMemberRow extends StatelessWidget {
   final CampaignMemberAssignment member;
-  final ValueChanged<CampaignMemberRole?> onRoleChanged;
-  final VoidCallback onRemove;
+  final ValueChanged<CampaignMemberRole?>? onRoleChanged;
+  final VoidCallback? onRemove;
 
   const _SelectedMemberRow({
     required this.member,
@@ -3209,12 +3484,21 @@ class _SelectedMemberRow extends StatelessWidget {
   }
 }
 
+final RegExp _campaignSingleLinePattern = RegExp(
+  r"[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s.,;:!¡?¿()#@&/_\-%']",
+);
+final RegExp _campaignMultilinePattern = RegExp(
+  r"[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s.,;:!¡?¿()#@&/_\-%'\n]",
+);
+
 class _SheetField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
   final String hint;
   final int maxLines;
   final TextInputType? keyboardType;
+  final int maxLength;
+  final List<TextInputFormatter>? inputFormatters;
 
   const _SheetField({
     required this.controller,
@@ -3222,28 +3506,57 @@ class _SheetField extends StatelessWidget {
     required this.hint,
     this.maxLines = 1,
     this.keyboardType,
+    this.maxLength = 300,
+    this.inputFormatters,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveInputFormatters = <TextInputFormatter>[
+      ...?inputFormatters,
+      LengthLimitingTextInputFormatter(maxLength),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: GoogleFonts.dmSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: context.textPrimary,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: GoogleFonts.dmSans(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.textPrimary,
+                ),
+              ),
+            ),
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                return Text(
+                  '${value.text.length}/$maxLength',
+                  style: GoogleFonts.dmSans(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: context.textMuted,
+                  ),
+                );
+              },
+            ),
+          ],
         ),
         const SizedBox(height: 6),
         TextField(
           controller: controller,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          inputFormatters: effectiveInputFormatters,
+          maxLength: maxLength,
           style: GoogleFonts.dmSans(fontSize: 13, color: context.textPrimary),
           decoration: InputDecoration(
+            counterText: '',
             hintText: hint,
             hintStyle: GoogleFonts.dmSans(
               fontSize: 13,

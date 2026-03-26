@@ -123,6 +123,8 @@ class _AdminMember {
     this.calendarioUrl,
   }) : forms = forms ?? _defaultForms();
 
+  bool get isAdmin => member.isAdmin;
+
   static List<_AdminSmartForm> _defaultForms() => [
     _AdminSmartForm(
       id: 'cotizacion',
@@ -387,6 +389,10 @@ class _AdminViewState extends State<AdminView> {
   }
 
   void _editMember(_AdminMember member) {
+    if (member.isAdmin) {
+      _showAdminEditBlockedToast();
+      return;
+    }
     if (Responsive.isDesktop(context)) {
       showDialog(
         context: context,
@@ -615,6 +621,10 @@ class _AdminViewState extends State<AdminView> {
   }
 
   Future<void> _toggleMember(_AdminMember m, bool value) async {
+    if (m.isAdmin) {
+      _showAdminEditBlockedToast();
+      return;
+    }
     final previous = m.isActive;
     setState(() => m.isActive = value);
     try {
@@ -636,10 +646,20 @@ class _AdminViewState extends State<AdminView> {
     } catch (e) {
       if (!mounted) return;
       setState(() => m.isActive = previous);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo actualizar la tarjeta: $e')),
+      TapLoopToast.show(
+        context,
+        'No se pudo actualizar la tarjeta. Intenta de nuevo.',
+        TapLoopToastType.error,
       );
     }
+  }
+
+  void _showAdminEditBlockedToast() {
+    TapLoopToast.show(
+      context,
+      'No se pueden editar administradores desde esta sección.',
+      TapLoopToastType.warning,
+    );
   }
 }
 
@@ -792,7 +812,7 @@ class _CompanyHeaderState extends State<_CompanyHeader> {
       if (mounted) {
         TapLoopToast.show(
           context,
-          'Logo actualizado.',
+          'El logo se actualizó correctamente.',
           TapLoopToastType.success,
         );
       }
@@ -1273,7 +1293,7 @@ class _DesktopMemberGrid extends StatelessWidget {
         crossAxisCount: 2,
         mainAxisSpacing: 10,
         crossAxisSpacing: 10,
-        mainAxisExtent: 100,
+        mainAxisExtent: 128,
       ),
       itemCount: members.length,
       itemBuilder: (_, i) =>
@@ -1324,6 +1344,7 @@ class _MemberCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = member.member;
+    final isAdmin = member.isAdmin;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1356,6 +1377,18 @@ class _MemberCard extends StatelessWidget {
                     color: context.textSecondary,
                   ),
                 ),
+                if (isAdmin)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Administrador',
+                      style: GoogleFonts.dmSans(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 2),
                 Text(
                   '${m.taps} taps · ${m.conversions} conv.',
@@ -1370,22 +1403,36 @@ class _MemberCard extends StatelessWidget {
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Switch.adaptive(
-                value: member.isActive,
-                onChanged: (v) => onToggle(member, v),
-                activeTrackColor: context.textPrimary,
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: isAdmin ? () => onToggle(member, member.isActive) : null,
+                child: AbsorbPointer(
+                  absorbing: isAdmin,
+                  child: Opacity(
+                    opacity: isAdmin ? 0.55 : 1,
+                    child: Switch.adaptive(
+                      value: member.isActive,
+                      onChanged: (v) => onToggle(member, v),
+                      activeTrackColor: context.textPrimary,
+                    ),
+                  ),
+                ),
               ),
               const SizedBox(height: 4),
               MouseRegion(
-                cursor: SystemMouseCursors.click,
+                cursor: isAdmin
+                    ? SystemMouseCursors.forbidden
+                    : SystemMouseCursors.click,
                 child: GestureDetector(
-                  onTap: () => onEdit(member),
+                  onTap: () => isAdmin
+                      ? onToggle(member, member.isActive)
+                      : onEdit(member),
                   child: Text(
                     'Editar',
                     style: GoogleFonts.dmSans(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: context.textPrimary,
+                      color: isAdmin ? context.textMuted : context.textPrimary,
                     ),
                   ),
                 ),

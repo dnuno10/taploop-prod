@@ -38,6 +38,24 @@ class CampaignRepository {
 
   static final _db = SupabaseService.client;
 
+  static Future<void> _assertCampaignMembersEditable(String campaignId) async {
+    final row = await _db
+        .from('campaigns')
+        .select(
+          'id, org_id, name, event_type, event_date, location, description, starts_at, ends_at',
+        )
+        .eq('id', campaignId)
+        .single();
+    final campaign = CampaignModel.fromJson(
+      Map<String, dynamic>.from(row as Map),
+    );
+    if (campaign.status == CampaignStatus.finished) {
+      throw Exception(
+        'No se puede modificar el equipo de una campaña terminada.',
+      );
+    }
+  }
+
   static Future<List<CampaignModel>> fetchCampaigns(String orgId) async {
     final rows = await _db
         .from('campaigns')
@@ -209,6 +227,7 @@ class CampaignRepository {
     String campaignId,
     String userId,
   ) async {
+    await _assertCampaignMembersEditable(campaignId);
     await _db.from('campaign_members').insert({
       'campaign_id': campaignId,
       'user_id': userId,
@@ -220,6 +239,7 @@ class CampaignRepository {
     List<String> userIds,
   ) async {
     if (userIds.isEmpty) return;
+    await _assertCampaignMembersEditable(campaignId);
     await _db
         .from('campaign_members')
         .insert(
@@ -233,6 +253,7 @@ class CampaignRepository {
     String campaignId,
     String userId,
   ) async {
+    await _assertCampaignMembersEditable(campaignId);
     await _db
         .from('campaign_members')
         .delete()
@@ -244,6 +265,7 @@ class CampaignRepository {
     String campaignId,
     List<String> userIds,
   ) async {
+    await _assertCampaignMembersEditable(campaignId);
     await _db.from('campaign_members').delete().eq('campaign_id', campaignId);
     await addCampaignMembers(campaignId, userIds);
   }

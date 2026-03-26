@@ -29,7 +29,7 @@ class AdminRepository {
     ).subtract(const Duration(days: 6));
     final users = await _db
         .from('users')
-        .select('id, name, job_title, photo_url')
+        .select('id, name, job_title, photo_url, role')
         .eq('org_id', orgId)
         .eq('is_active', true);
 
@@ -74,9 +74,7 @@ class AdminRepository {
     if (allCardIds.isNotEmpty) {
       final visitRows = await _db
           .from('visit_events')
-          .select(
-            'card_id, source, timestamp, contact_item_id, social_link_id',
-          )
+          .select('card_id, source, timestamp, contact_item_id, social_link_id')
           .inFilter('card_id', allCardIds);
       final rawVisitRows = (visitRows as List).cast<Map<String, dynamic>>();
       final currentLinksByRef = await _fetchCurrentLinksByRef(
@@ -201,7 +199,8 @@ class AdminRepository {
           if (i < cardClicks.length) clicksByDay[i] += cardClicks[i];
         }
         for (final stat
-            in (linkStatsByCard[cardId]?.values ?? const <TeamMemberLinkStat>[])) {
+            in (linkStatsByCard[cardId]?.values ??
+                const <TeamMemberLinkStat>[])) {
           final key = '${stat.platform}:${stat.label}';
           final current = aggregatedLinks[key];
           aggregatedLinks[key] = TeamMemberLinkStat(
@@ -217,6 +216,7 @@ class AdminRepository {
         cardIds: userCardIds,
         name: userJson['name'] as String? ?? '',
         jobTitle: userJson['job_title'] as String? ?? '',
+        role: userJson['role'] as String? ?? 'default',
         avatarUrl: userJson['photo_url'] as String?,
         taps: taps,
         leads: leads,

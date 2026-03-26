@@ -205,6 +205,7 @@ class AnalyticsRepository {
     String? smartFormId,
     required Map<String, String?> info,
   }) async {
+    final campaignId = await _resolveActiveCampaignIdForCard(cardId);
     Object? lastError;
     final attempts = <Map<String, dynamic>>[
       {
@@ -214,7 +215,7 @@ class AnalyticsRepository {
         'p_ip': info['ip'],
         'p_city': info['city'],
         'p_country': info['country'],
-        'p_campaign_id': null,
+        'p_campaign_id': campaignId,
         'p_contact_item_id': contactItemId,
         'p_social_link_id': socialLinkId,
         'p_smart_form_id': smartFormId,
@@ -226,7 +227,7 @@ class AnalyticsRepository {
         'p_ip': info['ip'],
         'p_city': info['city'],
         'p_country': info['country'],
-        'p_campaign_id': null,
+        'p_campaign_id': campaignId,
         'p_contact_item_id': null,
         'p_social_link_id': null,
         'p_smart_form_id': null,
@@ -245,6 +246,59 @@ class AnalyticsRepository {
     throw Exception(
       'record_card_visit failed for source=$source card=$cardId: $lastError',
     );
+  }
+
+  static Future<String?> _resolveActiveCampaignIdForCard(String cardId) async {
+    try {
+      final cardRows = await _db
+          .from('digital_cards')
+          .select('user_id')
+          .eq('id', cardId)
+          .limit(1);
+      if ((cardRows as List).isEmpty) return null;
+
+      final userId = cardRows.first['user_id'] as String?;
+      if (userId == null || userId.isEmpty) return null;
+
+      final memberRows = await _db
+          .from('campaign_members')
+          .select('campaign_id')
+          .eq('user_id', userId);
+      final campaignIds = memberRows
+          .cast<Map<String, dynamic>>()
+          .map((row) => row['campaign_id'] as String?)
+          .whereType<String>()
+          .where((id) => id.trim().isNotEmpty)
+          .toSet()
+          .toList();
+      if (campaignIds.isEmpty) return null;
+
+      final campaignRows = await _db
+          .from('campaigns')
+          .select('id, starts_at, ends_at')
+          .inFilter('id', campaignIds);
+
+      final now = DateTime.now();
+      final activeCampaigns = campaignRows
+          .cast<Map<String, dynamic>>()
+          .map(_ActiveCampaignWindow.fromJson)
+          .where(
+            (campaign) =>
+                campaign.startsAt != null &&
+                campaign.endsAt != null &&
+                !now.isBefore(campaign.startsAt!) &&
+                !now.isAfter(campaign.endsAt!),
+          )
+          .toList()
+        ..sort((a, b) => b.startsAt!.compareTo(a.startsAt!));
+
+      return activeCampaigns.isEmpty ? null : activeCampaigns.first.id;
+    } catch (error) {
+      debugPrint(
+        '[Analytics] resolve active campaign error for card=$cardId: $error',
+      );
+      return null;
+    }
   }
 
   // ─── Recent visit events (last N) ────────────────────────────────────────
@@ -404,4 +458,31 @@ class AnalyticsRepository {
 
     return resolved;
   }
+}
+
+class _ActiveCampaignWindow {
+  final String id;
+  final DateTime? startsAt;
+  final DateTime? endsAt;
+
+  const _ActiveCampaignWindow({
+    required this.id,
+    required this.startsAt,
+    required this.endsAt,
+  });
+
+  factory _ActiveCampaignWindow.fromJson(Map<String, dynamic> json) {
+    return _ActiveCampaignWindow(
+      id: json['id'] as String? ?? '',
+      startsAt: _parseTimestamp(json['starts_at']),
+      endsAt: _parseTimestamp(json['ends_at']),
+    );
+  }
+}
+
+DateTime? _parseTimestamp(dynamic value) {
+  if (value == null) return null;
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return null;
+  return DateTime.tryParse(raw)?.toLocal();
 }
