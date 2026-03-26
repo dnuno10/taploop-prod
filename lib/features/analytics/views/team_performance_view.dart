@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/data/app_state.dart';
@@ -520,8 +521,11 @@ class _ExplorerSearchField extends StatelessWidget {
     return TextField(
       controller: controller,
       onChanged: onChanged,
+      inputFormatters: [LengthLimitingTextInputFormatter(200)],
+      maxLength: 200,
       decoration: InputDecoration(
         hintText: 'Buscar miembro',
+        counterText: '',
         prefixIcon: const Icon(Icons.search_rounded, size: 18),
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
