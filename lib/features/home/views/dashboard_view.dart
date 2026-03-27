@@ -1574,36 +1574,6 @@ class _ActivityPanel extends StatelessWidget {
                 ),
               ),
             ),
-          if (leads.isNotEmpty) ...[
-            Divider(height: 28, color: context.borderColor),
-            Text(
-              'Lead destacado',
-              style: GoogleFonts.dmSans(
-                color: context.textSecondary,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.1,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              leads.first.displayName,
-              style: GoogleFonts.outfit(
-                color: context.textPrimary,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              leads.first.aiSummary,
-              style: GoogleFonts.dmSans(
-                color: context.textSecondary,
-                fontSize: 12,
-                height: 1.45,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1715,10 +1685,9 @@ class _LeadsHeaderRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
-          Expanded(flex: 4, child: Text('LEAD', style: style)),
-          Expanded(flex: 3, child: Text('ETAPA', style: style)),
+          Expanded(flex: 5, child: Text('LEAD', style: style)),
+          Expanded(flex: 4, child: Text('ETAPA', style: style)),
           Expanded(flex: 3, child: Text('ÚLTIMA VISITA', style: style)),
-          Expanded(flex: 2, child: Text('ESTADO', style: style)),
         ],
       ),
     );
@@ -1732,19 +1701,17 @@ class _LeadRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _statusMeta(lead.status);
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: _panelSurfaceColor(context),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _panelBorderColor(context)),
       ),
       child: Row(
         children: [
           Expanded(
-            flex: 4,
+            flex: 5,
             child: Row(
               children: [
                 CircleAvatar(
@@ -1794,7 +1761,7 @@ class _LeadRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            flex: 3,
+            flex: 4,
             child: Text(
               _pipelineLabel(lead.pipelineStage),
               style: GoogleFonts.dmSans(
@@ -1815,30 +1782,6 @@ class _LeadRow extends StatelessWidget {
               ),
             ),
           ),
-          Expanded(
-            flex: 2,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: status.background,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  status.label,
-                  style: GoogleFonts.dmSans(
-                    color: status.foreground,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );
@@ -1852,13 +1795,11 @@ class _LeadCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final status = _statusMeta(lead.status);
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _panelSurfaceColor(context),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _panelBorderColor(context)),
       ),
@@ -1902,24 +1843,6 @@ class _LeadCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: status.background,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  status.label,
-                  style: GoogleFonts.dmSans(
-                    color: status.foreground,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 14),
@@ -1949,7 +1872,7 @@ class _LeadMetric extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: _panelSurfaceColor(context),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _panelBorderColor(context)),
         ),
