@@ -390,7 +390,7 @@ class _DashboardHeader extends StatelessWidget {
         label: 'Compartir',
         icon: Icons.ios_share_outlined,
         filled: false,
-        onTap: () => onNavigate(3),
+        onTap: () => onNavigate(2),
       ),
       (
         label: 'Ver perfil',
@@ -936,7 +936,7 @@ class _QuickActions extends StatelessWidget {
         icon: Icons.send_outlined,
         label: 'Compartir tarjeta',
         description: 'Envía tu tarjeta por QR o enlace.',
-        onTap: () => onNavigate(3),
+        onTap: () => onNavigate(2),
       ),
       (
         icon: Icons.campaign_outlined,
@@ -1623,7 +1623,7 @@ class _LeadsTable extends StatelessWidget {
                 label: 'Abrir analíticas',
                 icon: Icons.arrow_forward_rounded,
                 filled: false,
-                onTap: () => onNavigate(2),
+                onTap: () => onNavigate(3),
               ),
             ],
           ),

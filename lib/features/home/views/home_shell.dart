@@ -50,8 +50,8 @@ class _HomeShellState extends State<HomeShell> {
   List<Widget> get _views => [
     DashboardView(onNavigate: (i) => setState(() => _index = i)),
     const EditCardView(),
-    const AnalyticsDashboardView(),
     const ShareCardView(),
+    const AnalyticsDashboardView(),
     const TeamPerformanceView(),
     const CampaignsView(),
     const AdminView(),
@@ -69,14 +69,14 @@ class _HomeShellState extends State<HomeShell> {
       label: 'Tarjeta',
     ),
     _NavItem(
-      icon: Icons.query_stats_outlined,
-      activeIcon: Icons.query_stats_rounded,
-      label: 'Analíticas',
-    ),
-    _NavItem(
       icon: Icons.share_outlined,
       activeIcon: Icons.share_rounded,
       label: 'Compartir',
+    ),
+    _NavItem(
+      icon: Icons.query_stats_outlined,
+      activeIcon: Icons.query_stats_rounded,
+      label: 'Analíticas',
     ),
     _NavItem(
       icon: Icons.groups_outlined,
