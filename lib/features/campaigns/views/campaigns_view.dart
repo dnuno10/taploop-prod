@@ -294,6 +294,7 @@ class _CampaignsViewState extends State<CampaignsView> {
             final idx = _campaigns.indexWhere((x) => x.id == updated.id);
             if (idx != -1) _campaigns[idx] = hydrated;
           });
+          TapLoopToast.show(context, 'Campaña actualizada correctamente.', TapLoopToastType.success);
         }
       } catch (e) {
         if (mounted) {
@@ -911,12 +912,13 @@ class _CampaignCardState extends State<_CampaignCard> {
     if (confirmed != true) return;
     try {
       await CampaignRepository.deleteCampaign(widget.campaign.id);
+      if (ctx.mounted) {
+        TapLoopToast.show(ctx, 'Campaña eliminada correctamente.', TapLoopToastType.success);
+      }
       widget.onDeleted?.call();
     } catch (e) {
       if (ctx.mounted) {
-        ScaffoldMessenger.of(
-          ctx,
-        ).showSnackBar(SnackBar(content: Text('Error al eliminar: $e')));
+        TapLoopToast.show(ctx, 'Error al eliminar la campaña. Intenta nuevamente.', TapLoopToastType.error);
       }
     }
   }

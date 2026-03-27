@@ -13,6 +13,7 @@ import '../../../core/data/app_state.dart';
 import '../../../core/data/repositories/analytics_repository.dart';
 import '../../../core/services/metrics_realtime_service.dart';
 import '../../../core/widgets/card_initial_setup_state.dart';
+import '../../../core/widgets/taploop_toast.dart';
 import '../../analytics/models/analytics_summary_model.dart';
 import '../../analytics/widgets/visit_event_tile.dart';
 import '../../analytics/widgets/link_stats_bar.dart';
@@ -129,145 +130,151 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
     final analytics = _analytics;
     if (analytics == null) return;
 
-    final rows = <List<dynamic>>[
-      ['TapLoop - Metrics Report'],
-      ['Rango', '${_fmtDate(_range.start)} - ${_fmtDate(_range.end)}'],
-      [],
-      ['Indicador', 'Valor'],
-      ['Visitas', analytics.totalVisits],
-      ['Taps NFC', analytics.totalTaps],
-      ['Clicks', analytics.totalClicks],
-      ['Interacciones totales', analytics.totalInteractions],
-      ['Visitas en el rango', analytics.visitsThisWeek],
-      ['Visitas período anterior', analytics.visitsLastWeek],
-      [
-        'Crecimiento de interacciones %',
-        analytics.interactionsGrowthPercent.toStringAsFixed(1),
-      ],
-      [],
-      ['Visitas por día', ''],
-      ['Fecha', 'Visitas'],
-    ];
+    try {
+      final rows = <List<dynamic>>[
+        ['TapLoop - Metrics Report'],
+        ['Rango', '${_fmtDate(_range.start)} - ${_fmtDate(_range.end)}'],
+        [],
+        ['Indicador', 'Valor'],
+        ['Visitas', analytics.totalVisits],
+        ['Taps NFC', analytics.totalTaps],
+        ['Clicks', analytics.totalClicks],
+        ['Interacciones totales', analytics.totalInteractions],
+        ['Visitas en el rango', analytics.visitsThisWeek],
+        ['Visitas período anterior', analytics.visitsLastWeek],
+        [
+          'Crecimiento de interacciones %',
+          analytics.interactionsGrowthPercent.toStringAsFixed(1),
+        ],
+        [],
+        ['Visitas por día', ''],
+        ['Fecha', 'Visitas'],
+      ];
 
-    for (var i = 0; i < analytics.visitsByDay.length; i++) {
-      final date = _range.end.subtract(
-        Duration(days: analytics.visitsByDay.length - 1 - i),
+      for (var i = 0; i < analytics.visitsByDay.length; i++) {
+        final date = _range.end.subtract(
+          Duration(days: analytics.visitsByDay.length - 1 - i),
+        );
+        rows.add([_fmtDate(date), analytics.visitsByDay[i]]);
+      }
+
+      final csv = const ListToCsvConverter().convert(rows);
+      final bytes = Uint8List.fromList(csv.codeUnits);
+      final fileName = 'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
+
+      await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: bytes,
+        fileExtension: 'csv',
+        mimeType: MimeType.csv,
       );
-      rows.add([_fmtDate(date), analytics.visitsByDay[i]]);
+
+      if (!mounted) return;
+      TapLoopToast.show(context, 'CSV exportado correctamente.', TapLoopToastType.success);
+    } catch (e) {
+      if (!mounted) return;
+      TapLoopToast.show(context, 'Error al exportar CSV. Intenta nuevamente.', TapLoopToastType.error);
     }
-
-    final csv = const ListToCsvConverter().convert(rows);
-    final bytes = Uint8List.fromList(csv.codeUnits);
-    final fileName = 'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
-
-    await FileSaver.instance.saveFile(
-      name: fileName,
-      bytes: bytes,
-      fileExtension: 'csv',
-      mimeType: MimeType.csv,
-    );
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('CSV exportado correctamente.')),
-    );
   }
 
   Future<void> _exportPdf() async {
     final analytics = _analytics;
     if (analytics == null) return;
 
-    final pdf = pw.Document();
-    final generatedAt = DateTime.now();
+    try {
+      final pdf = pw.Document();
+      final generatedAt = DateTime.now();
 
-    pdf.addPage(
-      pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28),
-        build: (context) => [
-          pw.Text(
-            'TapLoop - Reporte de Métricas',
-            style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 6),
-          pw.Text(
-            'Rango: ${_fmtDate(_range.start)} - ${_fmtDate(_range.end)}',
-            style: const pw.TextStyle(fontSize: 11),
-          ),
-          pw.Text(
-            'Generado: ${generatedAt.day}/${generatedAt.month}/${generatedAt.year}',
-            style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
-          ),
-          pw.SizedBox(height: 16),
-          pw.TableHelper.fromTextArray(
-            headerStyle: pw.TextStyle(
-              fontWeight: pw.FontWeight.bold,
-              color: PdfColors.white,
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(28),
+          build: (context) => [
+            pw.Text(
+              'TapLoop - Reporte de Métricas',
+              style: pw.TextStyle(fontSize: 22, fontWeight: pw.FontWeight.bold),
             ),
-            headerDecoration: const pw.BoxDecoration(
-              color: PdfColor(0.11, 0.31, 0.85),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              'Rango: ${_fmtDate(_range.start)} - ${_fmtDate(_range.end)}',
+              style: const pw.TextStyle(fontSize: 11),
             ),
-            cellPadding: const pw.EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 6,
+            pw.Text(
+              'Generado: ${generatedAt.day}/${generatedAt.month}/${generatedAt.year}',
+              style: const pw.TextStyle(fontSize: 10, color: PdfColors.grey700),
             ),
-            headers: ['Indicador', 'Valor'],
-            data: [
-              ['Visitas', '${analytics.totalVisits}'],
-              ['Taps NFC', '${analytics.totalTaps}'],
-              ['Clicks', '${analytics.totalClicks}'],
-              ['Interacciones totales', '${analytics.totalInteractions}'],
-              ['Visitas en el rango', '${analytics.visitsThisWeek}'],
-              ['Visitas período anterior', '${analytics.visitsLastWeek}'],
-              [
-                'Crecimiento de interacciones',
-                '${analytics.interactionsGrowthPercent.toStringAsFixed(1)}%',
-              ],
-            ],
-          ),
-          pw.SizedBox(height: 18),
-          pw.Text(
-            'Visitas por día',
-            style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-          ),
-          pw.SizedBox(height: 8),
-          pw.TableHelper.fromTextArray(
-            headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-            cellPadding: const pw.EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 6,
-            ),
-            headers: ['Fecha', 'Visitas'],
-            data: [
-              for (var i = 0; i < analytics.visitsByDay.length; i++)
+            pw.SizedBox(height: 16),
+            pw.TableHelper.fromTextArray(
+              headerStyle: pw.TextStyle(
+                fontWeight: pw.FontWeight.bold,
+                color: PdfColors.white,
+              ),
+              headerDecoration: const pw.BoxDecoration(
+                color: PdfColor(0.11, 0.31, 0.85),
+              ),
+              cellPadding: const pw.EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+              headers: ['Indicador', 'Valor'],
+              data: [
+                ['Visitas', '${analytics.totalVisits}'],
+                ['Taps NFC', '${analytics.totalTaps}'],
+                ['Clicks', '${analytics.totalClicks}'],
+                ['Interacciones totales', '${analytics.totalInteractions}'],
+                ['Visitas en el rango', '${analytics.visitsThisWeek}'],
+                ['Visitas período anterior', '${analytics.visitsLastWeek}'],
                 [
-                  _fmtDate(
-                    _range.end.subtract(
-                      Duration(days: analytics.visitsByDay.length - 1 - i),
-                    ),
-                  ),
-                  '${analytics.visitsByDay[i]}',
+                  'Crecimiento de interacciones',
+                  '${analytics.interactionsGrowthPercent.toStringAsFixed(1)}%',
                 ],
-            ],
-          ),
-        ],
-      ),
-    );
+              ],
+            ),
+            pw.SizedBox(height: 18),
+            pw.Text(
+              'Visitas por día',
+              style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 8),
+            pw.TableHelper.fromTextArray(
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              cellPadding: const pw.EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 6,
+              ),
+              headers: ['Fecha', 'Visitas'],
+              data: [
+                for (var i = 0; i < analytics.visitsByDay.length; i++)
+                  [
+                    _fmtDate(
+                      _range.end.subtract(
+                        Duration(days: analytics.visitsByDay.length - 1 - i),
+                      ),
+                    ),
+                    '${analytics.visitsByDay[i]}',
+                  ],
+              ],
+            ),
+          ],
+        ),
+      );
 
-    final bytes = await pdf.save();
-    final fileName = 'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
+      final bytes = await pdf.save();
+      final fileName = 'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
 
-    await FileSaver.instance.saveFile(
-      name: fileName,
-      bytes: bytes,
-      fileExtension: 'pdf',
-      mimeType: MimeType.pdf,
-    );
+      await FileSaver.instance.saveFile(
+        name: fileName,
+        bytes: bytes,
+        fileExtension: 'pdf',
+        mimeType: MimeType.pdf,
+      );
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('PDF exportado correctamente.')),
-    );
+      if (!mounted) return;
+      TapLoopToast.show(context, 'PDF exportado correctamente.', TapLoopToastType.success);
+    } catch (e) {
+      if (!mounted) return;
+      TapLoopToast.show(context, 'Error al exportar PDF. Intenta nuevamente.', TapLoopToastType.error);
+    }
   }
 
   static String _fmtDate(DateTime d) {
