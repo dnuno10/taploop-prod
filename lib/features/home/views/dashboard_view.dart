@@ -20,6 +20,8 @@ import '../../analytics/models/visit_event_model.dart';
 import '../../card/models/digital_card_model.dart';
 
 Color _panelBorderColor(BuildContext context) => context.borderSoft;
+Color _panelSurfaceColor(BuildContext context) =>
+    context.bgSubtle.withValues(alpha: 0.5);
 
 class DashboardView extends StatefulWidget {
   final void Function(int index) onNavigate;
@@ -252,7 +254,7 @@ class _DashboardViewState extends State<DashboardView> {
         subtitle: card?.publicSlug.isNotEmpty == true
             ? '@${card!.publicSlug}'
             : 'Sin slug publicado',
-        tone: context.bgCard,
+        tone: _panelSurfaceColor(context),
         icon: Icons.badge_outlined,
         compact: compact,
       ),
@@ -261,7 +263,7 @@ class _DashboardViewState extends State<DashboardView> {
         value: '${analytics?.totalVisits ?? 0}',
         delta: '${growth >= 0 ? '+' : ''}${growth.toStringAsFixed(0)}%',
         deltaPositive: growth >= 0,
-        tone: context.bgCard,
+        tone: _panelSurfaceColor(context),
         icon: Icons.visibility_outlined,
         compact: compact,
       ),
@@ -269,7 +271,7 @@ class _DashboardViewState extends State<DashboardView> {
         label: 'Interacciones',
         value: '${analytics?.totalClicks ?? 0}',
         subtitle: 'Clics en enlaces y CTA',
-        tone: context.bgCard,
+        tone: _panelSurfaceColor(context),
         icon: Icons.ads_click_outlined,
         compact: compact,
       ),
@@ -277,7 +279,7 @@ class _DashboardViewState extends State<DashboardView> {
         label: 'Leads activos',
         value: '$totalLeads',
         subtitle: '$hotLeads listos para seguimiento',
-        tone: context.bgCard,
+        tone: _panelSurfaceColor(context),
         icon: Icons.groups_2_outlined,
         compact: compact,
       ),
@@ -388,7 +390,7 @@ class _DashboardHeader extends StatelessWidget {
         label: 'Compartir',
         icon: Icons.ios_share_outlined,
         filled: false,
-        onTap: () => onNavigate(6),
+        onTap: () => onNavigate(3),
       ),
       (
         label: 'Ver perfil',
@@ -433,7 +435,7 @@ class _DashboardHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: context.bgCard,
+                  color: _panelSurfaceColor(context),
                   borderRadius: BorderRadius.circular(18),
                   border: Border.all(color: _panelBorderColor(context)),
                 ),
@@ -525,7 +527,7 @@ class _DashboardHeader extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: context.bgCard,
+            color: _panelSurfaceColor(context),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: _panelBorderColor(context)),
           ),
@@ -574,7 +576,7 @@ class _HeaderButton extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
           decoration: BoxDecoration(
-            color: context.bgCard,
+            color: _panelSurfaceColor(context),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: filled ? AppColors.primary : context.borderColor,
@@ -934,13 +936,13 @@ class _QuickActions extends StatelessWidget {
         icon: Icons.send_outlined,
         label: 'Compartir tarjeta',
         description: 'Envía tu tarjeta por QR o enlace.',
-        onTap: () => onNavigate(6),
+        onTap: () => onNavigate(3),
       ),
       (
         icon: Icons.campaign_outlined,
         label: 'Abrir campañas',
         description: 'Activa campañas y seguimiento comercial.',
-        onTap: () => onNavigate(4),
+        onTap: () => onNavigate(5),
       ),
       (
         icon: Icons.language_rounded,
@@ -1037,7 +1039,7 @@ class _ActionRow extends StatelessWidget {
         child: Ink(
           padding: EdgeInsets.all(compact ? 12 : 14),
           decoration: BoxDecoration(
-            color: context.bgCard,
+            color: _panelSurfaceColor(context),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(color: _panelBorderColor(context)),
           ),
@@ -1149,7 +1151,7 @@ class _CardPreviewPanel extends StatelessWidget {
             padding: EdgeInsets.all(compact ? 16 : 20),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(24),
-              color: context.bgCard,
+              color: _panelSurfaceColor(context),
               border: Border.all(color: _panelBorderColor(context)),
             ),
             child: Column(
@@ -1158,7 +1160,38 @@ class _CardPreviewPanel extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Image.asset('assets/images/taploop-logo.png', height: 22),
+                    if (card.companyLogoUrl?.isNotEmpty == true)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(
+                          maxWidth: 110,
+                          maxHeight: 28,
+                        ),
+                        child: Image.network(
+                          card.companyLogoUrl!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) => Text(
+                            card.company.isNotEmpty ? card.company : 'TapLoop',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.outfit(
+                              color: context.textPrimary,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        card.company.isNotEmpty ? card.company : 'TapLoop',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.outfit(
+                          color: context.textPrimary,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
                     Icon(
                       card.isActive ? Icons.check_circle : Icons.pause_circle,
                       color: context.textSecondary,
@@ -1704,7 +1737,7 @@ class _LeadRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
-        color: context.bgCard,
+        color: _panelSurfaceColor(context),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _panelBorderColor(context)),
       ),
@@ -1825,7 +1858,7 @@ class _LeadCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.bgCard,
+        color: _panelSurfaceColor(context),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _panelBorderColor(context)),
       ),
@@ -1916,7 +1949,7 @@ class _LeadMetric extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: context.bgCard,
+          color: _panelSurfaceColor(context),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: _panelBorderColor(context)),
         ),
@@ -1959,7 +1992,7 @@ class _Panel extends StatelessWidget {
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: context.bgCard,
+        color: _panelSurfaceColor(context),
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: _panelBorderColor(context)),
       ),

@@ -12,6 +12,11 @@ import '../../../core/utils/responsive.dart';
 import '../models/lead_model.dart';
 import '../models/team_member_model.dart';
 
+Color _teamAnalyticsSurfaceColor(BuildContext context) =>
+    context.bgSubtle.withValues(alpha: 0.5);
+
+Color _teamAnalyticsBorderColor(BuildContext context) => context.borderSoft;
+
 class TeamPerformanceView extends StatefulWidget {
   const TeamPerformanceView({super.key});
 
@@ -174,7 +179,7 @@ class _TeamPerformanceViewState extends State<TeamPerformanceView> {
           slivers: [
             SliverToBoxAdapter(
               child: Container(
-                color: context.bgCard,
+                color: Colors.white,
                 padding: EdgeInsets.fromLTRB(
                   Responsive.isMobile(context) ? 20 : 32,
                   24,
@@ -220,9 +225,11 @@ class _TeamPerformanceViewState extends State<TeamPerformanceView> {
                   child: Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: context.bgCard,
+                      color: _teamAnalyticsSurfaceColor(context),
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: context.borderColor),
+                      border: Border.all(
+                        color: _teamAnalyticsBorderColor(context),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,41 +258,6 @@ class _TeamPerformanceViewState extends State<TeamPerformanceView> {
                           totalClicks: totalClicks,
                           totalLeads: totalLeads,
                         ),
-                        const SizedBox(height: 18),
-                        Responsive.isDesktop(context)
-                            ? Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
-                                    flex: 5,
-                                    child: _TeamLeaderPanel(
-                                      member: topMember,
-                                      totalMembers: _members.length,
-                                      totalLeads: totalLeads,
-                                      totalViews: totalViews,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 24),
-                                  Expanded(
-                                    flex: 4,
-                                    child: _TopMembersColumn(
-                                      members: rankedMembers,
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : Column(
-                                children: [
-                                  _TeamLeaderPanel(
-                                    member: topMember,
-                                    totalMembers: _members.length,
-                                    totalLeads: totalLeads,
-                                    totalViews: totalViews,
-                                  ),
-                                  const SizedBox(height: 20),
-                                  _TopMembersColumn(members: rankedMembers),
-                                ],
-                              ),
                       ],
                     ),
                   ),
@@ -302,9 +274,65 @@ class _TeamPerformanceViewState extends State<TeamPerformanceView> {
                   child: Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _teamAnalyticsSurfaceColor(context),
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: context.borderColor),
+                      border: Border.all(
+                        color: _teamAnalyticsBorderColor(context),
+                      ),
+                    ),
+                    child: Responsive.isDesktop(context)
+                        ? Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                flex: 5,
+                                child: _TeamLeaderPanel(
+                                  member: topMember,
+                                  totalMembers: _members.length,
+                                  totalLeads: totalLeads,
+                                  totalViews: totalViews,
+                                ),
+                              ),
+                              const SizedBox(width: 24),
+                              Expanded(
+                                flex: 4,
+                                child: _TopMembersColumn(
+                                  members: rankedMembers,
+                                ),
+                              ),
+                            ],
+                          )
+                        : Column(
+                            children: [
+                              _TeamLeaderPanel(
+                                member: topMember,
+                                totalMembers: _members.length,
+                                totalLeads: totalLeads,
+                                totalViews: totalViews,
+                              ),
+                              const SizedBox(height: 20),
+                              _TopMembersColumn(members: rankedMembers),
+                            ],
+                          ),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    Responsive.isMobile(context) ? 20 : 32,
+                    16,
+                    Responsive.isMobile(context) ? 20 : 32,
+                    0,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: _teamAnalyticsSurfaceColor(context),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: _teamAnalyticsBorderColor(context),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,9 +375,11 @@ class _TeamPerformanceViewState extends State<TeamPerformanceView> {
                   child: Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: _teamAnalyticsSurfaceColor(context),
                       borderRadius: BorderRadius.circular(28),
-                      border: Border.all(color: context.borderColor),
+                      border: Border.all(
+                        color: _teamAnalyticsBorderColor(context),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,10 +625,12 @@ class _ExplorerMemberTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: active
                 ? AppColors.primary.withValues(alpha: 0.08)
-                : context.bgCard,
+                : _teamAnalyticsSurfaceColor(context),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: active ? AppColors.primary : context.borderColor,
+              color: active
+                  ? AppColors.primary
+                  : _teamAnalyticsBorderColor(context),
             ),
           ),
           child: Row(
@@ -671,9 +703,9 @@ class _EmptyTeamExplorer extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: context.bgCard,
+        color: _teamAnalyticsSurfaceColor(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _teamAnalyticsBorderColor(context)),
       ),
       child: Text(
         'No hay miembros disponibles para mostrar.',
@@ -1123,17 +1155,14 @@ class _MemberAnalyticsCardState extends State<_MemberAnalyticsCard> {
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _teamAnalyticsSurfaceColor(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _teamAnalyticsBorderColor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _MemberOverviewHeader(
-            member: widget.member,
-            rank: widget.rank,
-          ),
+          _MemberOverviewHeader(member: widget.member, rank: widget.rank),
           const SizedBox(height: 18),
           _MemberKpiGrid(
             member: widget.member,
@@ -1182,10 +1211,7 @@ class _MemberOverviewHeader extends StatelessWidget {
   final TeamMemberModel member;
   final int rank;
 
-  const _MemberOverviewHeader({
-    required this.member,
-    required this.rank,
-  });
+  const _MemberOverviewHeader({required this.member, required this.rank});
 
   @override
   Widget build(BuildContext context) {
@@ -1737,10 +1763,14 @@ class _LeadCompactCard extends StatelessWidget {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
       decoration: BoxDecoration(
-        color: selected ? const Color(0xFFFFF4ED) : Colors.white,
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.08)
+            : _teamAnalyticsSurfaceColor(context),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: selected ? const Color(0xFFFFC7A8) : context.borderColor,
+          color: selected
+              ? const Color(0xFFFFC7A8)
+              : _teamAnalyticsBorderColor(context),
         ),
       ),
       child: Material(
@@ -1842,8 +1872,9 @@ class _LeadDetailPanel extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
+        color: _teamAnalyticsSurfaceColor(context),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _teamAnalyticsBorderColor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1862,10 +1893,8 @@ class _LeadDetailPanel extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 [
-                  if ((lead.company ?? '').trim().isNotEmpty)
-                    lead.company!,
-                  if ((lead.location ?? '').trim().isNotEmpty)
-                    lead.location!,
+                  if ((lead.company ?? '').trim().isNotEmpty) lead.company!,
+                  if ((lead.location ?? '').trim().isNotEmpty) lead.location!,
                 ].join(' · '),
                 style: GoogleFonts.dmSans(
                   fontSize: 12,
@@ -1950,8 +1979,9 @@ class _LeadJourneyTimeline extends StatelessWidget {
                 width: 156,
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
+                  color: _teamAnalyticsSurfaceColor(context),
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: context.borderColor),
+                  border: Border.all(color: _teamAnalyticsBorderColor(context)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1997,7 +2027,6 @@ final LeadModel _emptyLead = LeadModel(
   firstSeen: DateTime.fromMillisecondsSinceEpoch(0),
   lastSeen: DateTime.fromMillisecondsSinceEpoch(0),
 );
-
 
 String _funnelInsight(TeamMemberModel member) {
   final viewToTap = member.profileViews == 0

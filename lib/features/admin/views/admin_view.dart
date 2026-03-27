@@ -298,10 +298,7 @@ class _AdminViewState extends State<AdminView> {
   static Future<List<_AdminMember>> _buildMembers(
     List<TeamMemberModel> teamMembers,
   ) async {
-    final styles = [
-      CardThemeStyle.white,
-      CardThemeStyle.black,
-    ];
+    final styles = [CardThemeStyle.white, CardThemeStyle.black];
     final colors = [
       const Color(0xFF0D0D0D),
       const Color(0xFF1F2937),
@@ -535,7 +532,6 @@ class _AdminViewState extends State<AdminView> {
                 decoration: BoxDecoration(
                   color: context.bgCard,
                   borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: context.borderColor),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

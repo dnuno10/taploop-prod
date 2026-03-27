@@ -150,6 +150,8 @@ class _PipelineViewState extends State<PipelineView> {
     final emptyMessage = _selectedStage == _PipelineStage.proposals
         ? 'No hay propuestas pendientes por cerrar'
         : 'Sin ventas cerradas aún';
+    final useProposalWhiteSurface =
+        !context.isDark && _selectedStage == _PipelineStage.proposals;
 
     return CustomScrollView(
       slivers: [
@@ -166,7 +168,11 @@ class _PipelineViewState extends State<PipelineView> {
 
         // ── Active Stage ──────────────────────────────────────────────
         SliverToBoxAdapter(
-          child: _SectionLabel(label: activeLabel, count: filteredLeads.length),
+          child: _SectionLabel(
+            label: activeLabel,
+            count: filteredLeads.length,
+            solidSurface: useProposalWhiteSurface,
+          ),
         ),
         if (_selectedStage == _PipelineStage.proposals)
           SliverToBoxAdapter(
@@ -204,9 +210,11 @@ class _PipelineViewState extends State<PipelineView> {
                           },
                         ),
                   filled: true,
-                  fillColor: context.isDark
-                      ? Colors.white.withValues(alpha: 0.04)
-                      : Colors.white.withValues(alpha: 0.68),
+                  fillColor: useProposalWhiteSurface
+                      ? Colors.white
+                      : (context.isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : Colors.white.withValues(alpha: 0.68)),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: context.borderColor),
@@ -227,7 +235,12 @@ class _PipelineViewState extends State<PipelineView> {
             ),
           ),
         if (filteredLeads.isEmpty)
-          SliverToBoxAdapter(child: _EmptyHint(message: emptyMessage))
+          SliverToBoxAdapter(
+            child: _EmptyHint(
+              message: emptyMessage,
+              solidSurface: useProposalWhiteSurface,
+            ),
+          )
         else if (_selectedStage == _PipelineStage.proposals)
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
@@ -241,6 +254,7 @@ class _PipelineViewState extends State<PipelineView> {
               delegate: SliverChildBuilderDelegate(
                 (_, i) => _LeadCard(
                   lead: filteredLeads[i],
+                  solidSurface: useProposalWhiteSurface,
                   onMarkClosed: () => _markConverted(filteredLeads[i]),
                 ),
                 childCount: filteredLeads.length,
@@ -252,7 +266,11 @@ class _PipelineViewState extends State<PipelineView> {
             delegate: SliverChildBuilderDelegate(
               (_, i) => Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-                child: _LeadCard(lead: filteredLeads[i], onMarkClosed: null),
+                child: _LeadCard(
+                  lead: filteredLeads[i],
+                  solidSurface: false,
+                  onMarkClosed: null,
+                ),
               ),
               childCount: filteredLeads.length,
             ),
@@ -523,8 +541,13 @@ class _StatTile extends StatelessWidget {
 class _SectionLabel extends StatelessWidget {
   final String label;
   final int count;
+  final bool solidSurface;
 
-  const _SectionLabel({required this.label, required this.count});
+  const _SectionLabel({
+    required this.label,
+    required this.count,
+    required this.solidSurface,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -546,9 +569,11 @@ class _SectionLabel extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: context.isDark
-                  ? Colors.white.withValues(alpha: 0.04)
-                  : Colors.white.withValues(alpha: 0.62),
+              color: solidSurface
+                  ? Colors.white
+                  : (context.isDark
+                        ? Colors.white.withValues(alpha: 0.04)
+                        : Colors.white.withValues(alpha: 0.62)),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -570,7 +595,9 @@ class _SectionLabel extends StatelessWidget {
 
 class _EmptyHint extends StatelessWidget {
   final String message;
-  const _EmptyHint({required this.message});
+  final bool solidSurface;
+
+  const _EmptyHint({required this.message, required this.solidSurface});
 
   @override
   Widget build(BuildContext context) {
@@ -579,9 +606,11 @@ class _EmptyHint extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 20),
         decoration: BoxDecoration(
-          color: context.isDark
-              ? Colors.white.withValues(alpha: 0.03)
-              : Colors.white.withValues(alpha: 0.62),
+          color: solidSurface
+              ? Colors.white
+              : (context.isDark
+                    ? Colors.white.withValues(alpha: 0.03)
+                    : Colors.white.withValues(alpha: 0.62)),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Center(
@@ -599,9 +628,14 @@ class _EmptyHint extends StatelessWidget {
 
 class _LeadCard extends StatelessWidget {
   final LeadModel lead;
+  final bool solidSurface;
   final VoidCallback? onMarkClosed;
 
-  const _LeadCard({required this.lead, required this.onMarkClosed});
+  const _LeadCard({
+    required this.lead,
+    required this.solidSurface,
+    required this.onMarkClosed,
+  });
 
   String _latestActionLabel(LeadModel lead) {
     if (lead.actions.isEmpty) return 'Sin actividad registrada';
@@ -636,9 +670,11 @@ class _LeadCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: context.isDark
-            ? Colors.white.withValues(alpha: 0.02)
-            : Colors.white.withValues(alpha: 0.58),
+        color: solidSurface
+            ? Colors.white
+            : (context.isDark
+                  ? Colors.white.withValues(alpha: 0.02)
+                  : Colors.white.withValues(alpha: 0.58)),
         borderRadius: BorderRadius.circular(12),
       ),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),

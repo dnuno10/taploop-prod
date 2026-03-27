@@ -51,10 +51,10 @@ class _HomeShellState extends State<HomeShell> {
     DashboardView(onNavigate: (i) => setState(() => _index = i)),
     const EditCardView(),
     const AnalyticsDashboardView(),
+    const ShareCardView(),
     const TeamPerformanceView(),
     const CampaignsView(),
     const AdminView(),
-    const ShareCardView(),
   ];
 
   static const _navItems = [
@@ -74,6 +74,11 @@ class _HomeShellState extends State<HomeShell> {
       label: 'Analíticas',
     ),
     _NavItem(
+      icon: Icons.share_outlined,
+      activeIcon: Icons.share_rounded,
+      label: 'Compartir',
+    ),
+    _NavItem(
       icon: Icons.groups_outlined,
       activeIcon: Icons.groups_rounded,
       label: 'Equipo',
@@ -87,11 +92,6 @@ class _HomeShellState extends State<HomeShell> {
       icon: Icons.admin_panel_settings_outlined,
       activeIcon: Icons.admin_panel_settings_rounded,
       label: 'Administración',
-    ),
-    _NavItem(
-      icon: Icons.share_outlined,
-      activeIcon: Icons.share_rounded,
-      label: 'Compartir',
     ),
   ];
 

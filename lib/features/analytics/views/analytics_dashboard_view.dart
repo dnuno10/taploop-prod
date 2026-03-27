@@ -22,6 +22,14 @@ import 'lead_intelligence_view.dart';
 import 'sales_outcome_view.dart';
 import 'pipeline_view.dart';
 
+Color _analyticsPanelSurfaceColor(BuildContext context) =>
+    context.bgSubtle.withValues(alpha: 0.5);
+
+Color _analyticsPanelBorderColor(BuildContext context) => context.borderSoft;
+
+Color _pipelinePanelSurfaceColor(BuildContext context) =>
+    context.bgPage.withValues(alpha: 0.5);
+
 class AnalyticsDashboardView extends StatefulWidget {
   const AnalyticsDashboardView({super.key});
 
@@ -160,7 +168,8 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
 
       final csv = const ListToCsvConverter().convert(rows);
       final bytes = Uint8List.fromList(csv.codeUnits);
-      final fileName = 'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
+      final fileName =
+          'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
 
       await FileSaver.instance.saveFile(
         name: fileName,
@@ -170,10 +179,18 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
       );
 
       if (!mounted) return;
-      TapLoopToast.show(context, 'CSV exportado correctamente.', TapLoopToastType.success);
+      TapLoopToast.show(
+        context,
+        'CSV exportado correctamente.',
+        TapLoopToastType.success,
+      );
     } catch (e) {
       if (!mounted) return;
-      TapLoopToast.show(context, 'Error al exportar CSV. Intenta nuevamente.', TapLoopToastType.error);
+      TapLoopToast.show(
+        context,
+        'Error al exportar CSV. Intenta nuevamente.',
+        TapLoopToastType.error,
+      );
     }
   }
 
@@ -260,7 +277,8 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
       );
 
       final bytes = await pdf.save();
-      final fileName = 'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
+      final fileName =
+          'taploop_metrics_${DateTime.now().millisecondsSinceEpoch}';
 
       await FileSaver.instance.saveFile(
         name: fileName,
@@ -270,10 +288,18 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
       );
 
       if (!mounted) return;
-      TapLoopToast.show(context, 'PDF exportado correctamente.', TapLoopToastType.success);
+      TapLoopToast.show(
+        context,
+        'PDF exportado correctamente.',
+        TapLoopToastType.success,
+      );
     } catch (e) {
       if (!mounted) return;
-      TapLoopToast.show(context, 'Error al exportar PDF. Intenta nuevamente.', TapLoopToastType.error);
+      TapLoopToast.show(
+        context,
+        'Error al exportar PDF. Intenta nuevamente.',
+        TapLoopToastType.error,
+      );
     }
   }
 
@@ -320,7 +346,7 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
               alignment: Alignment.centerLeft,
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 18),
               decoration: BoxDecoration(
-                color: context.bgCard,
+                color: Colors.white,
                 border: Border(bottom: BorderSide(color: context.borderColor)),
               ),
               child: Column(
@@ -386,9 +412,8 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: context.bgCard,
+                          color: context.bgSubtle,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: context.borderColor),
                         ),
                         child: TabBar(
                           controller: _tab,
@@ -432,35 +457,49 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
                         controller: _tab,
                         children: [
                           // ── Mis métricas ────────────────────────────────────────────────
-                          SingleChildScrollView(
-                            child: _loading
-                                ? const SizedBox(
-                                    height: 300,
-                                    child: Center(
-                                      child: CircularProgressIndicator(),
+                          _AnalyticsTabPanel(
+                            surfaceColor: Colors.white,
+                            showBorder: false,
+                            child: SingleChildScrollView(
+                              child: _loading
+                                  ? const SizedBox(
+                                      height: 300,
+                                      child: Center(
+                                        child: CircularProgressIndicator(),
+                                      ),
+                                    )
+                                  : analytics == null
+                                  ? const SizedBox(
+                                      height: 300,
+                                      child: Center(child: Text('Sin datos')),
+                                    )
+                                  : isDesktop
+                                  ? _DesktopLayout(
+                                      analytics: analytics,
+                                      rangeEnd: _range.end,
+                                    )
+                                  : _MobileLayout(
+                                      analytics: analytics,
+                                      isMobile: isMobile,
+                                      rangeEnd: _range.end,
                                     ),
-                                  )
-                                : analytics == null
-                                ? const SizedBox(
-                                    height: 300,
-                                    child: Center(child: Text('Sin datos')),
-                                  )
-                                : isDesktop
-                                ? _DesktopLayout(
-                                    analytics: analytics,
-                                    rangeEnd: _range.end,
-                                  )
-                                : _MobileLayout(
-                                    analytics: analytics,
-                                    isMobile: isMobile,
-                                    rangeEnd: _range.end,
-                                  ),
+                            ),
                           ),
                           const _AnalyticsTabPanel(
+                            surfaceColor: Colors.white,
+                            showBorder: false,
                             child: LeadIntelligenceView(),
                           ),
-                          const _AnalyticsTabPanel(child: PipelineView()),
-                          const _AnalyticsTabPanel(child: SalesOutcomeView()),
+                          _AnalyticsTabPanel(
+                            surfaceColor: _pipelinePanelSurfaceColor(context),
+                            showBorder: false,
+                            child: const PipelineView(),
+                          ),
+                          const _AnalyticsTabPanel(
+                            surfaceColor: Colors.white,
+                            showBorder: false,
+                            child: SalesOutcomeView(),
+                          ),
                         ],
                       )
                     : SingleChildScrollView(
@@ -480,8 +519,14 @@ class _AnalyticsDashboardViewState extends State<AnalyticsDashboardView>
 
 class _AnalyticsTabPanel extends StatelessWidget {
   final Widget child;
+  final Color? surfaceColor;
+  final bool showBorder;
 
-  const _AnalyticsTabPanel({required this.child});
+  const _AnalyticsTabPanel({
+    required this.child,
+    this.surfaceColor,
+    this.showBorder = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -489,9 +534,9 @@ class _AnalyticsTabPanel extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       child: Container(
         decoration: BoxDecoration(
-          color: context.bgCard,
+          color: surfaceColor ?? _analyticsPanelSurfaceColor(context),
           borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: context.borderColor),
+          border: showBorder ? Border.all(color: context.borderColor) : null,
         ),
         clipBehavior: Clip.hardEdge,
         child: child,
@@ -517,34 +562,26 @@ class _MobileLayout extends StatelessWidget {
     final px = isMobile ? 20.0 : 40.0;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: px, vertical: 24),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: context.bgCard,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _TotalBlock(analytics: analytics),
-            const SizedBox(height: 32),
-            _MetricRow(analytics: analytics),
-            const SizedBox(height: 40),
-            Divider(color: context.borderColor, height: 1),
-            const SizedBox(height: 36),
-            _ChartBlock(analytics: analytics, rangeEnd: rangeEnd),
-            const SizedBox(height: 40),
-            Divider(color: context.borderColor, height: 1),
-            const SizedBox(height: 36),
-            _LinksBlock(analytics: analytics),
-            const SizedBox(height: 40),
-            Divider(color: context.borderColor, height: 1),
-            const SizedBox(height: 36),
-            _ActivityBlock(analytics: analytics),
-            const SizedBox(height: 48),
-          ],
-        ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _TotalBlock(analytics: analytics),
+          const SizedBox(height: 32),
+          _MetricRow(analytics: analytics),
+          const SizedBox(height: 40),
+          Divider(color: context.borderColor, height: 1),
+          const SizedBox(height: 36),
+          _ChartBlock(analytics: analytics, rangeEnd: rangeEnd),
+          const SizedBox(height: 40),
+          Divider(color: context.borderColor, height: 1),
+          const SizedBox(height: 36),
+          _LinksBlock(analytics: analytics),
+          const SizedBox(height: 40),
+          Divider(color: context.borderColor, height: 1),
+          const SizedBox(height: 36),
+          _ActivityBlock(analytics: analytics),
+          const SizedBox(height: 48),
+        ],
       ),
     );
   }
@@ -559,44 +596,37 @@ class _DesktopLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(18),
-      child: Container(
-        decoration: BoxDecoration(
-          color: context.bgCard,
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: context.borderColor),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              flex: 7,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(32, 28, 32, 32),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TotalBlock(analytics: analytics),
-                    const SizedBox(height: 24),
-                    _MetricRow(analytics: analytics),
-                    const SizedBox(height: 28),
-                    _ChartBlock(analytics: analytics, rangeEnd: rangeEnd),
-                    const SizedBox(height: 28),
-                    _LinksBlock(analytics: analytics),
-                    const SizedBox(height: 12),
-                  ],
-                ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            flex: 7,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TotalBlock(analytics: analytics),
+                  const SizedBox(height: 24),
+                  _MetricRow(analytics: analytics),
+                  const SizedBox(height: 28),
+                  _ChartBlock(analytics: analytics, rangeEnd: rangeEnd),
+                  const SizedBox(height: 28),
+                  _LinksBlock(analytics: analytics),
+                  const SizedBox(height: 12),
+                ],
               ),
             ),
-            Container(
-              width: 320,
-              decoration: BoxDecoration(
-                border: Border(left: BorderSide(color: context.borderColor)),
-              ),
-              padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+          ),
+          const SizedBox(width: 20),
+          SizedBox(
+            width: 320,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 10, 0, 14),
               child: _ActivityBlock(analytics: analytics),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -623,9 +653,9 @@ class _TotalBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
       decoration: BoxDecoration(
-        color: context.bgCard,
+        color: _analyticsPanelSurfaceColor(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _analyticsPanelBorderColor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -761,9 +791,9 @@ class _MetricRow extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _analyticsPanelSurfaceColor(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _analyticsPanelBorderColor(context)),
       ),
       child: Row(
         children: items
@@ -862,9 +892,9 @@ class _MetricCompactCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _analyticsPanelSurfaceColor(context),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _analyticsPanelBorderColor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,9 +956,9 @@ class _ChartBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _analyticsPanelSurfaceColor(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _analyticsPanelBorderColor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1011,9 +1041,9 @@ class _LinksBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _analyticsPanelSurfaceColor(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _analyticsPanelBorderColor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1084,9 +1114,9 @@ class _ActivityBlock extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _analyticsPanelSurfaceColor(context),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: context.borderColor),
+        border: Border.all(color: _analyticsPanelBorderColor(context)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1106,18 +1136,19 @@ class _ActivityBlock extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           ...List.generate(
-              analytics.recentEvents.length > 10
-                  ? 10
-                  : analytics.recentEvents.length,
-              (i) {
-            return Column(
-              children: [
-                VisitEventTile(event: analytics.recentEvents[i]),
-                if (i < analytics.recentEvents.length - 1)
-                  Divider(color: context.borderColor, height: 1),
-              ],
-            );
-          }),
+            analytics.recentEvents.length > 10
+                ? 10
+                : analytics.recentEvents.length,
+            (i) {
+              return Column(
+                children: [
+                  VisitEventTile(event: analytics.recentEvents[i]),
+                  if (i < analytics.recentEvents.length - 1)
+                    Divider(color: context.borderColor, height: 1),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -1140,9 +1171,9 @@ class _PeriodChip extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: context.bgCard,
+            color: _analyticsPanelSurfaceColor(context),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: context.borderColor),
+            border: Border.all(color: _analyticsPanelBorderColor(context)),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

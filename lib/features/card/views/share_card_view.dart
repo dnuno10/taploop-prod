@@ -888,7 +888,7 @@ class _QuickShareButton extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color: context.bgSubtle,
+            color: Colors.white,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: context.borderColor),
           ),
