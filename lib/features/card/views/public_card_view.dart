@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -934,7 +935,7 @@ class _SaveContactSectionState extends State<_SaveContactSection> {
       final fileName = _buildVCardFileName(widget.card.name);
       final bytes = Uint8List.fromList(
         utf8.encode(
-          _buildVCard(
+          await _buildVCard(
             card: widget.card,
             contacts: widget.contacts,
             socials: widget.socials,
@@ -1031,7 +1032,7 @@ class _SaveContactSectionState extends State<_SaveContactSection> {
   String _downloadSuccessMessage(_VCardPersistResult result) {
     if (kIsWeb) {
       if (result.webAction == 'opened') {
-        return 'Se intentó abrir la vCard en la app disponible del dispositivo.';
+        return 'La vCard se abrió en la app disponible del dispositivo.';
       }
       return 'La vCard se descargó en tu dispositivo.';
     }
@@ -1124,11 +1125,11 @@ String _buildVCardFileName(String name) {
   return 'contacto_$compact';
 }
 
-String _buildVCard({
+Future<String> _buildVCard({
   required DigitalCardModel card,
   required List<ContactItemModel> contacts,
   required List<SocialLinkModel> socials,
-}) {
+}) async {
   final lines = <String>[
     'BEGIN:VCARD',
     'VERSION:3.0',
@@ -1145,6 +1146,11 @@ String _buildVCard({
   }
   if (card.jobTitle.trim().isNotEmpty) {
     lines.add('TITLE:${_escapeVCardValue(card.jobTitle)}');
+  }
+
+  final photoUrl = card.profilePhotoUrl?.trim();
+  if (photoUrl != null && photoUrl.isNotEmpty) {
+    lines.addAll(await _buildVCardPhotoLines(photoUrl));
   }
 
   final seenPhoneNumbers = <String>{};
@@ -1245,6 +1251,103 @@ String _buildVCard({
   lines.add('END:VCARD');
 
   return '${lines.join('\r\n')}\r\n';
+}
+
+Future<List<String>> _buildVCardPhotoLines(String imageUrl) async {
+  try {
+    final uri = Uri.tryParse(imageUrl);
+    if (uri == null) return const [];
+
+    final response = await http.get(uri);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return const [];
+    }
+
+    final imageBytes = response.bodyBytes;
+    if (imageBytes.isEmpty) return const [];
+
+    final mediaType = _resolveImageMediaType(
+      contentTypeHeader: response.headers['content-type'],
+      imageUrl: imageUrl,
+    );
+    final typeSegment = mediaType.vCardType.isNotEmpty
+        ? ';TYPE=${mediaType.vCardType}'
+        : '';
+    final encoded = base64Encode(imageBytes);
+
+    return _foldVCardLine('PHOTO;ENCODING=b$typeSegment:$encoded');
+  } catch (_) {
+    return const [];
+  }
+}
+
+List<String> _foldVCardLine(String line, {int maxLineLength = 75}) {
+  if (line.length <= maxLineLength) return [line];
+
+  final folded = <String>[];
+  var start = 0;
+  var isFirstLine = true;
+
+  while (start < line.length) {
+    final availableLength = isFirstLine ? maxLineLength : maxLineLength - 1;
+    final end = (start + availableLength).clamp(0, line.length);
+    final chunk = line.substring(start, end);
+    folded.add(isFirstLine ? chunk : ' $chunk');
+    start = end;
+    isFirstLine = false;
+  }
+
+  return folded;
+}
+
+({String vCardType}) _resolveImageMediaType({
+  required String? contentTypeHeader,
+  required String imageUrl,
+}) {
+  final normalizedHeader = contentTypeHeader
+      ?.split(';')
+      .first
+      .trim()
+      .toLowerCase();
+  final normalizedUrl = imageUrl.toLowerCase().split('?').first;
+
+  if (normalizedHeader != null && normalizedHeader.isNotEmpty) {
+    final typeFromHeader = _vCardImageTypeFromMime(normalizedHeader);
+    if (typeFromHeader != null) {
+      return (vCardType: typeFromHeader);
+    }
+  }
+
+  if (normalizedUrl.endsWith('.jpg') || normalizedUrl.endsWith('.jpeg')) {
+    return (vCardType: 'JPEG');
+  }
+  if (normalizedUrl.endsWith('.png')) {
+    return (vCardType: 'PNG');
+  }
+  if (normalizedUrl.endsWith('.gif')) {
+    return (vCardType: 'GIF');
+  }
+  if (normalizedUrl.endsWith('.webp')) {
+    return (vCardType: 'WEBP');
+  }
+
+  return (vCardType: '');
+}
+
+String? _vCardImageTypeFromMime(String mimeType) {
+  switch (mimeType) {
+    case 'image/jpeg':
+    case 'image/jpg':
+      return 'JPEG';
+    case 'image/png':
+      return 'PNG';
+    case 'image/gif':
+      return 'GIF';
+    case 'image/webp':
+      return 'WEBP';
+    default:
+      return null;
+  }
 }
 
 void _appendVCardUrl({
